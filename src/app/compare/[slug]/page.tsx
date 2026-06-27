@@ -1,4 +1,6 @@
 import { getSettingsBySlug } from "@/lib/data";
+
+export const revalidate = 60;
 import { OS_LABELS, CATEGORIES } from "@/lib/types";
 import PathTrail from "@/components/PathTrail";
 import OSBadge from "@/components/OSBadge";

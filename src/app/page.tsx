@@ -6,6 +6,8 @@ import Link from "next/link";
 import { OS_LABELS } from "@/lib/types";
 import { getAllSettings } from "@/lib/data";
 
+export const revalidate = 60;
+
 const STATIC_POPULAR = [
   { label: "拡張子表示", q: "拡張子" },
   { label: "Bluetooth", q: "Bluetooth" },

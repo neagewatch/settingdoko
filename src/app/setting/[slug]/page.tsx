@@ -1,3 +1,5 @@
+export const revalidate = 60;
+
 import { getSettingBySlugAndOS, getSettingsBySlug, getRelatedSettings } from "@/lib/data";
 import { OSType, OS_LABELS, CATEGORIES, DIFFICULTY_LABELS, DIFFICULTY_COLORS } from "@/lib/types";
 import PathTrail from "@/components/PathTrail";

@@ -1,4 +1,6 @@
 import { getAllSettings } from "@/lib/data";
+
+export const revalidate = 60;
 import { OS_LABELS, OSType } from "@/lib/types";
 import SettingCard from "@/components/SettingCard";
 import Link from "next/link";

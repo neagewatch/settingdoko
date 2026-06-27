@@ -1,4 +1,6 @@
 import { getSettingsByOS } from "@/lib/data";
+
+export const revalidate = 60; // 60秒ごとに再生成
 import { OSType, OS_LABELS, CATEGORIES } from "@/lib/types";
 import SettingCard from "@/components/SettingCard";
 import SearchBox from "@/components/SearchBox";

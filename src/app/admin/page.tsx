@@ -6,6 +6,7 @@ import AdminAuth from "./AdminAuth";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
 
+export const revalidate = 0; // 常に最新を取得
 export const metadata: Metadata = { title: "管理画面", robots: "noindex" };
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "settingdoko2024";
