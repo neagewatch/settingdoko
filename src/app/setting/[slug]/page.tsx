@@ -12,6 +12,7 @@ import ShareBar from "@/components/ShareBar";
 import StepChecklist from "@/components/StepChecklist";
 import MockScreenshot from "@/components/MockScreenshot";
 import { CopyStepsButton } from "@/components/Utilities";
+import ReportButton from "@/components/ReportButton";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -166,6 +167,17 @@ async function renderDetail(
         </div>
       </div>
 
+      {/* Real screenshot if available */}
+      {setting.screenshot_url && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定画面スクリーンショット</span>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={setting.screenshot_url} alt={setting.title} style={{ width: "100%", borderRadius: 12, border: "1px solid var(--border)", display: "block" }} />
+        </div>
+      )}
+
       {/* Mock screenshot */}
       <div className="no-print" style={{ marginBottom: 14 }}>
         <div style={{ marginBottom: 8 }}>
@@ -183,9 +195,17 @@ async function renderDetail(
         <StepChecklist steps={setting.steps} progressKey={progressKey} />
       </div>
 
-      {/* Helpful */}
+      {/* Helpful + report */}
       <div className="no-print" style={{ ...card, padding: "18px 28px" }}>
-        <HelpfulButton settingId={setting.id} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <HelpfulButton settingId={setting.id} />
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              最終更新: {new Date(setting.updated_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
+            </span>
+            <ReportButton settingId={setting.id} title={setting.title} />
+          </div>
+        </div>
       </div>
 
       {/* Share */}

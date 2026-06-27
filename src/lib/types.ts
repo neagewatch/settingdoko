@@ -19,6 +19,7 @@ export interface Setting {
   helpful_count?: number;
   difficulty?: Difficulty;
   estimate_minutes?: number;
+  screenshot_url?: string; // 追加：スクリーンショット画像URL
 }
 
 export const OS_LABELS: Record<string, string> = {
@@ -35,6 +36,14 @@ export const OS_ICONS: Record<string, string> = {
   macos: "",
   android: "🤖",
   windows10: "⊞",
+};
+
+export const OS_COLORS: Record<string, string> = {
+  windows11: "#0078D4",
+  ios: "#1D1D1F",
+  macos: "#1D1D1F",
+  android: "#34A853",
+  windows10: "#0078D4",
 };
 
 export const CATEGORIES: Record<string, string> = {
@@ -54,6 +63,13 @@ export const CATEGORIES: Record<string, string> = {
   account: "アカウント",
 };
 
+export const CATEGORY_ICONS: Record<string, string> = {
+  display: "🖥", sound: "🔊", network: "📶", bluetooth: "🔵",
+  privacy: "🔒", notification: "🔔", storage: "💾", system: "⚙️",
+  input: "⌨️", accessibility: "♿", security: "🛡", file: "📁",
+  app: "📱", account: "👤",
+};
+
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   beginner: "初心者向け",
   intermediate: "中級者向け",
@@ -67,21 +83,11 @@ export const DIFFICULTY_COLORS: Record<Difficulty, string> = {
 };
 
 export const ALIAS_MAP: Record<string, string> = {
-  "ぶるーとぅーす": "Bluetooth",
-  "ぶるーとぅ": "Bluetooth",
-  "わいふぁい": "Wi-Fi",
-  "わいふぁー": "Wi-Fi",
-  "かくちょうし": "拡張子",
-  "かくちょし": "拡張子",
-  "つうち": "通知",
-  "まいく": "マイク",
-  "かめら": "カメラ",
-  "あかるさ": "明るさ",
-  "でぃすぷれい": "ディスプレイ",
-  "bluetooth": "Bluetooth",
-  "wifi": "Wi-Fi",
-  "wi fi": "Wi-Fi",
-  "dns": "DNS",
-  "mic": "マイク",
-  "camera": "カメラ",
+  "ぶるーとぅーす": "Bluetooth", "ぶるーとぅ": "Bluetooth",
+  "わいふぁい": "Wi-Fi", "わいふぁー": "Wi-Fi",
+  "かくちょうし": "拡張子", "かくちょし": "拡張子",
+  "つうち": "通知", "まいく": "マイク", "かめら": "カメラ",
+  "あかるさ": "明るさ", "でぃすぷれい": "ディスプレイ",
+  "bluetooth": "Bluetooth", "wifi": "Wi-Fi", "wi fi": "Wi-Fi",
+  "dns": "DNS", "mic": "マイク", "camera": "カメラ",
 };

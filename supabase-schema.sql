@@ -51,3 +51,6 @@ CREATE POLICY "Public read access"  ON settings FOR SELECT USING (true);
 CREATE POLICY "Authenticated insert" ON settings FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated update" ON settings FOR UPDATE USING (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated delete" ON settings FOR DELETE USING (auth.role() = 'authenticated');
+
+-- screenshot_url カラム追加（既存テーブルへの追加）
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS screenshot_url TEXT;

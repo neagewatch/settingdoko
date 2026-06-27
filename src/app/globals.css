@@ -460,3 +460,9 @@ body {
     size: A4;
   }
 }
+
+/* ===== Category dropdown ===== */
+.cat-dropdown-item:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}

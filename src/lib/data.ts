@@ -77,3 +77,32 @@ export async function getRelatedSettings(relatedSlugs: string[], currentId: stri
     (s) => relatedSlugs.includes(s.slug) && s.id !== currentId
   );
 }
+
+// ===== 管理画面用 CRUD =====
+
+export async function createSetting(data: Omit<Setting, "id" | "updated_at">): Promise<Setting | null> {
+  if (!USE_SUPABASE) return null;
+  const { data: result, error } = await supabase!.from("settings").insert([data]).select().single();
+  if (error) throw error;
+  return result;
+}
+
+export async function updateSetting(id: string, data: Partial<Omit<Setting, "id">>): Promise<Setting | null> {
+  if (!USE_SUPABASE) return null;
+  const { data: result, error } = await supabase!.from("settings").update(data).eq("id", id).select().single();
+  if (error) throw error;
+  return result;
+}
+
+export async function deleteSetting(id: string): Promise<void> {
+  if (!USE_SUPABASE) return;
+  const { error } = await supabase!.from("settings").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function getSettingById(id: string): Promise<Setting | null> {
+  if (!USE_SUPABASE) return null;
+  const { data, error } = await supabase!.from("settings").select("*").eq("id", id).single();
+  if (error) return null;
+  return data;
+}
