@@ -3,6 +3,7 @@ import { Setting, OSType } from "./types";
 import { allSampleSettings } from "./sample-data-export";
 import { searchSettings } from "./search";
 
+// supabaseがnullの場合はサンプルデータで動作
 const USE_SUPABASE = supabase !== null;
 
 function withIds(items: typeof allSampleSettings): Setting[] {

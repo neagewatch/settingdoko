@@ -1,6 +1,6 @@
 export const revalidate = 60;
 
-import { getSettingBySlugAndOS, getSettingsBySlug, getRelatedSettings } from "@/lib/data";
+import { getSettingBySlugAndOS, getSettingsBySlug, getRelatedSettings, getSettingsByOS } from "@/lib/data";
 import { OSType, OS_LABELS, CATEGORIES, DIFFICULTY_LABELS, DIFFICULTY_COLORS } from "@/lib/types";
 import PathTrail from "@/components/PathTrail";
 import OSTabs from "@/components/OSTabs";
@@ -29,9 +29,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const osType = (os as OSType) || "windows11";
   const setting = await getSettingBySlugAndOS(slug, osType);
   if (!setting) return { title: "設定が見つかりません" };
-
   const ogImageUrl = `${BASE_URL}/api/og?title=${encodeURIComponent(setting.title)}&os=${setting.os}&path=${encodeURIComponent(setting.path.join(" › "))}`;
-
   return {
     title: `${setting.title}（${OS_LABELS[setting.os]}）`,
     description: `${OS_LABELS[setting.os]}で${setting.title}方法。設定場所：${setting.path.join(" > ")}`,
@@ -40,12 +38,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
       description: setting.description,
       images: [{ url: ogImageUrl, width: 1200, height: 630, alt: setting.title }],
     },
-    twitter: {
-      card: "summary_large_image",
-      title: `${setting.title} | 設定どこ？`,
-      description: setting.description,
-      images: [ogImageUrl],
-    },
+    twitter: { card: "summary_large_image", title: `${setting.title} | 設定どこ？`, description: setting.description, images: [ogImageUrl] },
   };
 }
 
@@ -73,6 +66,13 @@ async function renderDetail(
   const related = await getRelatedSettings(setting.related_slugs, setting.id);
   const progressKey = `${setting.slug}-${setting.os}`;
 
+  // 前/次ナビ用：同OSのカテゴリ内設定を取得
+  const osSettings = await getSettingsByOS(setting.os as OSType);
+  const catSettings = osSettings.filter((s) => s.category === setting.category);
+  const currentIdx = catSettings.findIndex((s) => s.slug === setting.slug);
+  const prevSetting = currentIdx > 0 ? catSettings[currentIdx - 1] : null;
+  const nextSetting = currentIdx < catSettings.length - 1 ? catSettings[currentIdx + 1] : null;
+
   const jsonLd = {
     "@context": "https://schema.org", "@type": "HowTo",
     name: setting.title, description: setting.description,
@@ -86,6 +86,18 @@ async function renderDetail(
       { "@type": "ListItem", position: 3, name: setting.title },
     ],
   };
+  // FAQ Schema
+  const faqLd = {
+    "@context": "https://schema.org", "@type": "FAQPage",
+    mainEntity: [{
+      "@type": "Question",
+      name: `${OS_LABELS[setting.os]}で${setting.title}方法は？`,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: `${setting.description} 設定場所：${setting.path.join(" > ")}。手順：${setting.steps.join("→")}`,
+      },
+    }],
+  };
 
   const card = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "24px 28px", marginBottom: 14 };
 
@@ -93,10 +105,17 @@ async function renderDetail(
     <div style={{ padding: "28px 0 60px" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
       <ViewTracker slug={slug} os={setting.os} title={setting.title} />
 
+      {/* 印刷用ヘッダー（画面では非表示） */}
+      <div className="print-header" style={{ display: "none" }}>
+        <span className="print-header-logo">⚙️ 設定どこ？</span>
+        <span className="print-header-url">{BASE_URL}/setting/{slug}?os={setting.os}</span>
+      </div>
+
       {/* Breadcrumb */}
-      <div style={{ marginBottom: 20, fontSize: 13, color: "var(--text-muted)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="no-print" style={{ marginBottom: 20, fontSize: 13, color: "var(--text-muted)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         <Link href="/" style={{ color: "var(--text-muted)", textDecoration: "none" }}>トップ</Link>
         <span>›</span>
         <Link href={`/os/${setting.os}`} style={{ color: "var(--text-muted)", textDecoration: "none" }}>{OS_LABELS[setting.os]}</Link>
@@ -106,7 +125,7 @@ async function renderDetail(
 
       {/* OS Tabs */}
       {availableOS.length > 1 && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="no-print" style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
           <OSTabs current={setting.os} slug={slug} availableOS={availableOS} />
           <Link href={`/compare/${slug}`} style={{ fontSize: 12, color: "var(--primary)", textDecoration: "none", marginLeft: 8, padding: "6px 12px", border: "1px solid var(--primary)", borderRadius: 999 }}>
             OS比較 →
@@ -114,7 +133,7 @@ async function renderDetail(
         </div>
       )}
 
-      {/* Header */}
+      {/* Header card */}
       <div style={card}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
           <div style={{ flex: 1 }}>
@@ -134,20 +153,21 @@ async function renderDetail(
             <h1 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 10px", letterSpacing: "-0.01em" }}>{setting.title}</h1>
             <p style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>{setting.description}</p>
           </div>
-          <BookmarkButton slug={slug} os={setting.os} title={setting.title} category={setting.category} />
+          <div className="no-print">
+            <BookmarkButton slug={slug} os={setting.os} title={setting.title} category={setting.category} />
+          </div>
         </div>
-
         <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定場所</span>
-            <CopyPathButton path={setting.path} />
+            <span className="no-print"><CopyPathButton path={setting.path} /></span>
           </div>
           <PathTrail path={setting.path} />
         </div>
       </div>
 
       {/* Mock screenshot */}
-      <div style={{ marginBottom: 14 }}>
+      <div className="no-print" style={{ marginBottom: 14 }}>
         <div style={{ marginBottom: 8 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定画面イメージ</span>
         </div>
@@ -158,18 +178,18 @@ async function renderDetail(
       <div style={card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>手順</h2>
-          <CopyStepsButton steps={setting.steps} path={setting.path} />
+          <span className="no-print"><CopyStepsButton steps={setting.steps} path={setting.path} /></span>
         </div>
         <StepChecklist steps={setting.steps} progressKey={progressKey} />
       </div>
 
       {/* Helpful */}
-      <div style={{ ...card, padding: "18px 28px" }}>
+      <div className="no-print" style={{ ...card, padding: "18px 28px" }}>
         <HelpfulButton settingId={setting.id} />
       </div>
 
       {/* Share */}
-      <div style={{ ...card, padding: "18px 28px" }}>
+      <div className="no-print" style={{ ...card, padding: "18px 28px" }}>
         <ShareBar title={setting.title} />
       </div>
 
@@ -189,15 +209,26 @@ async function renderDetail(
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-        <Link href={`/os/${setting.os}`} style={{ fontSize: 13, color: "var(--primary)", textDecoration: "none", padding: "8px 0" }}>
+      {/* Prev/Next nav */}
+      <div className="prev-next-nav no-print">
+        {prevSetting ? (
+          <Link href={`/setting/${prevSetting.slug}?os=${prevSetting.os}`} className="prev-next-btn prev">
+            <span className="prev-next-label">← 前の設定</span>
+            <span className="prev-next-title">{prevSetting.title}</span>
+          </Link>
+        ) : <div />}
+        {nextSetting ? (
+          <Link href={`/setting/${nextSetting.slug}?os=${nextSetting.os}`} className="prev-next-btn next">
+            <span className="prev-next-label">次の設定 →</span>
+            <span className="prev-next-title">{nextSetting.title}</span>
+          </Link>
+        ) : <div />}
+      </div>
+
+      <div className="no-print" style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+        <Link href={`/os/${setting.os}`} style={{ fontSize: 13, color: "var(--text-muted)", textDecoration: "none" }}>
           ← {OS_LABELS[setting.os]}の設定一覧に戻る
         </Link>
-        {availableOS.length > 1 && (
-          <Link href={`/compare/${slug}`} style={{ fontSize: 13, color: "var(--primary)", textDecoration: "none", padding: "8px 0" }}>
-            OS比較を見る →
-          </Link>
-        )}
       </div>
     </div>
   );
