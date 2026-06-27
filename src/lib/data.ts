@@ -3,10 +3,7 @@ import { Setting, OSType } from "./types";
 import { allSampleSettings } from "./sample-data-export";
 import { searchSettings } from "./search";
 
-const USE_SUPABASE = !!(
-  process.env.NEXT_PUBLIC_SUPABASE_URL &&
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const USE_SUPABASE = supabase !== null;
 
 function withIds(items: typeof allSampleSettings): Setting[] {
   return items.map((item, i) => ({
