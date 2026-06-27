@@ -2,15 +2,14 @@
 
 import { useState, useEffect } from "react";
 
-export default function ShareBar({ title, url }: { title: string; url?: string }) {
-  const [currentUrl, setCurrentUrl] = useState(url || "");
+export default function ShareBar({ title }: { title: string }) {
+  const [currentUrl, setCurrentUrl] = useState("");
   const [urlCopied, setUrlCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [qrSrc, setQrSrc] = useState("");
 
   useEffect(() => {
-    if (!currentUrl) setCurrentUrl(window.location.href);
-  }, [currentUrl]);
+    setCurrentUrl(window.location.href);
+  }, []);
 
   const encodedUrl = encodeURIComponent(currentUrl);
   const encodedText = encodeURIComponent(`${title} | 設定どこ？`);
@@ -23,22 +22,13 @@ export default function ShareBar({ title, url }: { title: string; url?: string }
     } catch {}
   }
 
-  function handlePrint() { window.print(); }
-
-  function handleQR() {
-    // Google Charts API（無料・外部通信のみ）
-    setQrSrc(`https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl=${encodedUrl}&choe=UTF-8`);
-    setShowQR(true);
-  }
-
   return (
     <>
       <div className="share-bar">
         <span style={{ fontSize: 13, color: "var(--text-muted)", marginRight: 4 }}>シェア:</span>
 
-        {/* X (Twitter) */}
         <a
-          href={`https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`}
+          href={currentUrl ? `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}` : "#"}
           target="_blank" rel="noopener noreferrer"
           className="share-btn share-btn-x"
         >
@@ -46,9 +36,8 @@ export default function ShareBar({ title, url }: { title: string; url?: string }
           X でシェア
         </a>
 
-        {/* LINE */}
         <a
-          href={`https://line.me/R/msg/text/?${encodedText}%0A${encodedUrl}`}
+          href={currentUrl ? `https://line.me/R/msg/text/?${encodedText}%0A${encodedUrl}` : "#"}
           target="_blank" rel="noopener noreferrer"
           className="share-btn share-btn-line"
         >
@@ -56,38 +45,32 @@ export default function ShareBar({ title, url }: { title: string; url?: string }
           LINE
         </a>
 
-        {/* URL copy */}
         <button onClick={handleCopyUrl} className="share-btn share-btn-copy">
           {urlCopied ? "✓ コピー済み" : "🔗 URLをコピー"}
         </button>
 
-        {/* QR */}
-        <button onClick={handleQR} className="share-btn share-btn-qr">
+        <button onClick={() => setShowQR(true)} className="share-btn share-btn-qr">
           📱 QRコード
         </button>
 
-        {/* Print */}
-        <button onClick={handlePrint} className="share-btn share-btn-print no-print">
+        <button onClick={() => window.print()} className="share-btn share-btn-print no-print">
           🖨 印刷
         </button>
       </div>
 
-      {/* QR modal */}
-      {showQR && (
+      {showQR && currentUrl && (
         <div className="modal-backdrop" onClick={() => setShowQR(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>QRコード</h3>
-            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
-              スマホでスキャンするとこのページが開きます
-            </p>
-            {qrSrc && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={qrSrc} alt="QR Code" width={200} height={200} style={{ display: "block", margin: "0 auto 16px" }} />
-            )}
-            <button
-              onClick={() => setShowQR(false)}
-              style={{ padding: "8px 24px", borderRadius: 8, background: "var(--primary)", color: "white", border: "none", cursor: "pointer", fontSize: 14 }}
-            >
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>QRコード</h3>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>スマホでスキャンするとこのページが開きます</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl=${encodedUrl}&choe=UTF-8`}
+              alt="QR Code" width={200} height={200}
+              style={{ display: "block", margin: "0 auto 16px" }}
+            />
+            <button onClick={() => setShowQR(false)}
+              style={{ padding: "8px 24px", borderRadius: 8, background: "var(--primary)", color: "white", border: "none", cursor: "pointer", fontSize: 14 }}>
               閉じる
             </button>
           </div>

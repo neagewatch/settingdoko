@@ -14,6 +14,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
+
 type Props = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ os?: string }>;
@@ -25,12 +27,22 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const osType = (os as OSType) || "windows11";
   const setting = await getSettingBySlugAndOS(slug, osType);
   if (!setting) return { title: "設定が見つかりません" };
+
+  const ogImageUrl = `${BASE_URL}/api/og?title=${encodeURIComponent(setting.title)}&os=${setting.os}&path=${encodeURIComponent(setting.path.join(" › "))}`;
+
   return {
     title: `${setting.title}（${OS_LABELS[setting.os]}）`,
     description: `${OS_LABELS[setting.os]}で${setting.title}方法。設定場所：${setting.path.join(" > ")}`,
     openGraph: {
       title: `${setting.title} | 設定どこ？`,
       description: setting.description,
+      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: setting.title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${setting.title} | 設定どこ？`,
+      description: setting.description,
+      images: [ogImageUrl],
     },
   };
 }
@@ -60,18 +72,15 @@ async function renderDetail(
   const progressKey = `${setting.slug}-${setting.os}`;
 
   const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "HowTo",
-    name: setting.title,
-    description: setting.description,
+    "@context": "https://schema.org", "@type": "HowTo",
+    name: setting.title, description: setting.description,
     step: setting.steps.map((step, i) => ({ "@type": "HowToStep", position: i + 1, text: step })),
   };
   const breadcrumbLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
+    "@context": "https://schema.org", "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "ホーム", item: "https://settingdoko.vercel.app/" },
-      { "@type": "ListItem", position: 2, name: OS_LABELS[setting.os], item: `https://settingdoko.vercel.app/os/${setting.os}` },
+      { "@type": "ListItem", position: 1, name: "ホーム", item: `${BASE_URL}/` },
+      { "@type": "ListItem", position: 2, name: OS_LABELS[setting.os], item: `${BASE_URL}/os/${setting.os}` },
       { "@type": "ListItem", position: 3, name: setting.title },
     ],
   };
@@ -107,21 +116,12 @@ async function renderDetail(
       <div style={card}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            {/* Meta row */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
               <OSBadge os={setting.os} />
-              <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>
-                {setting.version}
-              </span>
-              <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>
-                {CATEGORIES[setting.category] || setting.category}
-              </span>
+              <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{setting.version}</span>
+              <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{CATEGORIES[setting.category] || setting.category}</span>
               {setting.difficulty && (
-                <span className="diff-badge" style={{
-                  background: `${DIFFICULTY_COLORS[setting.difficulty]}20`,
-                  color: DIFFICULTY_COLORS[setting.difficulty],
-                  border: `1px solid ${DIFFICULTY_COLORS[setting.difficulty]}40`,
-                }}>
+                <span className="diff-badge" style={{ background: `${DIFFICULTY_COLORS[setting.difficulty]}20`, color: DIFFICULTY_COLORS[setting.difficulty], border: `1px solid ${DIFFICULTY_COLORS[setting.difficulty]}40` }}>
                   {DIFFICULTY_LABELS[setting.difficulty]}
                 </span>
               )}
@@ -129,22 +129,12 @@ async function renderDetail(
                 <span style={{ fontSize: 12, color: "var(--text-muted)" }}>⏱ 約{setting.estimate_minutes}分</span>
               )}
             </div>
-
-            <h1 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 10px", letterSpacing: "-0.01em" }}>
-              {setting.title}
-            </h1>
-            <p style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>
-              {setting.description}
-            </p>
+            <h1 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 10px", letterSpacing: "-0.01em" }}>{setting.title}</h1>
+            <p style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>{setting.description}</p>
           </div>
-
-          {/* Action buttons */}
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <BookmarkButton slug={slug} os={setting.os} title={setting.title} category={setting.category} />
-          </div>
+          <BookmarkButton slug={slug} os={setting.os} title={setting.title} category={setting.category} />
         </div>
 
-        {/* Path */}
         <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定場所</span>
@@ -162,7 +152,7 @@ async function renderDetail(
         <MockScreenshot os={setting.os} category={setting.category} path={setting.path} title={setting.title} />
       </div>
 
-      {/* Steps with checklist */}
+      {/* Steps */}
       <div style={card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>手順</h2>
@@ -171,7 +161,7 @@ async function renderDetail(
         <StepChecklist steps={setting.steps} progressKey={progressKey} />
       </div>
 
-      {/* Helpful feedback */}
+      {/* Helpful */}
       <div style={{ ...card, padding: "18px 28px" }}>
         <HelpfulButton settingId={setting.id} />
       </div>
@@ -181,17 +171,13 @@ async function renderDetail(
         <ShareBar title={setting.title} />
       </div>
 
-      {/* Related settings */}
+      {/* Related */}
       {related.length > 0 && (
         <div style={card}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 14px" }}>関連する設定</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {related.map((r) => (
-              <Link key={r.id} href={`/setting/${r.slug}?os=${r.os}`} style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: "12px 16px", borderRadius: 10, background: "var(--surface-2)",
-                textDecoration: "none", color: "var(--text)",
-              }}>
+              <Link key={r.id} href={`/setting/${r.slug}?os=${r.os}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 10, background: "var(--surface-2)", textDecoration: "none", color: "var(--text)" }}>
                 <OSBadge os={r.os} />
                 <span style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>{r.title}</span>
                 <span style={{ color: "var(--text-muted)", fontSize: 14 }}>→</span>
@@ -201,7 +187,6 @@ async function renderDetail(
         </div>
       )}
 
-      {/* Nav: prev/next placeholder */}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
         <Link href={`/os/${setting.os}`} style={{ fontSize: 13, color: "var(--primary)", textDecoration: "none", padding: "8px 0" }}>
           ← {OS_LABELS[setting.os]}の設定一覧に戻る

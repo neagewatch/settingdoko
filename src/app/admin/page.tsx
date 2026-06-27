@@ -2,13 +2,29 @@ import { getAllSettings } from "@/lib/data";
 import { OS_LABELS, CATEGORIES } from "@/lib/types";
 import Link from "next/link";
 import AdminClient from "./AdminClient";
+import AdminAuth from "./AdminAuth";
+import { cookies } from "next/headers";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "管理画面", robots: "noindex" };
 
-export default async function AdminPage() {
-  const settings = await getAllSettings();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "settingdoko2024";
 
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ auth?: string }>;
+}) {
+  const params = await searchParams;
+  const cookieStore = await cookies();
+  const authCookie = cookieStore.get("admin_auth");
+  const isAuthed = authCookie?.value === ADMIN_PASSWORD || params.auth === ADMIN_PASSWORD;
+
+  if (!isAuthed) {
+    return <AdminAuth />;
+  }
+
+  const settings = await getAllSettings();
   const osCount: Record<string, number> = {};
   const catCount: Record<string, number> = {};
   for (const s of settings) {
@@ -25,7 +41,6 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 32 }}>
         {Object.entries(osCount).map(([os, count]) => (
           <div key={os} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "16px 20px" }}>
@@ -39,10 +54,8 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* Client components: analytics + AI assist */}
       <AdminClient settings={settings} />
 
-      {/* Settings table */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden", marginTop: 32 }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
           <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>設定データ一覧</h2>
@@ -60,9 +73,7 @@ export default async function AdminPage() {
               {settings.map((s) => (
                 <tr key={s.id} style={{ borderBottom: "1px solid var(--border)" }}>
                   <td style={{ padding: "10px 16px" }}>
-                    <Link href={`/setting/${s.slug}?os=${s.os}`} style={{ color: "var(--primary)", textDecoration: "none", fontWeight: 500 }}>
-                      {s.title}
-                    </Link>
+                    <Link href={`/setting/${s.slug}?os=${s.os}`} style={{ color: "var(--primary)", textDecoration: "none", fontWeight: 500 }}>{s.title}</Link>
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{s.path.join(" › ")}</div>
                   </td>
                   <td style={{ padding: "10px 16px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{OS_LABELS[s.os] || s.os}</td>

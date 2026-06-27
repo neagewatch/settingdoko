@@ -64,13 +64,22 @@ const FEATURES: Feature[] = [
 
 type Props = { params: Promise<{ id: string }> };
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const feature = FEATURES.find(f => f.id === id);
   if (!feature) return { title: "特集" };
+  const ogImageUrl = `${BASE_URL}/api/og?title=${encodeURIComponent(feature.emoji + " " + feature.title)}`;
   return {
     title: feature.title,
     description: feature.description,
+    openGraph: {
+      title: `${feature.title} | 設定どこ？`,
+      description: feature.description,
+      images: [{ url: ogImageUrl, width: 1200, height: 630 }],
+    },
+    twitter: { card: "summary_large_image", images: [ogImageUrl] },
   };
 }
 
