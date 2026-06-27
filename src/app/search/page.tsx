@@ -45,7 +45,7 @@ export default async function SearchPage({ searchParams }: Props) {
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
           {/* OS filter */}
           <Link href={`/search?q=${encodeURIComponent(q)}${diff ? `&diff=${diff}` : ""}`} className={`filter-chip ${!os ? "active" : ""}`}>すべてのOS</Link>
-          {(["windows11", "ios", "macos"] as const).map((o) => (
+          {(["windows11", "ios", "macos", "android"] as const).map((o) => (
             <Link key={o} href={`/search?q=${encodeURIComponent(q)}&os=${o}${diff ? `&diff=${diff}` : ""}`} className={`filter-chip ${os === o ? "active" : ""}`}>
               {OS_LABELS[o]}
             </Link>
@@ -105,7 +105,7 @@ export default async function SearchPage({ searchParams }: Props) {
               )}
 
               <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                {(["windows11", "ios", "macos"] as const).map((o) => (
+                {(["windows11", "ios", "macos", "android"] as const).map((o) => (
                   <Link key={o} href={`/os/${o}`} className="os-tab">{OS_LABELS[o]}</Link>
                 ))}
               </div>

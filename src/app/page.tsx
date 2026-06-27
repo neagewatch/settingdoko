@@ -92,7 +92,7 @@ export default async function Home() {
           OSから探す
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-          {(["windows11", "ios", "macos"] as const).map((os) => (
+          {(["windows11", "ios", "macos", "android"] as const).map((os) => (
             <Link key={os} href={`/os/${os}`} style={{
               background: "var(--surface)", border: "1px solid var(--border)",
               borderRadius: "var(--radius)", padding: "18px 20px",

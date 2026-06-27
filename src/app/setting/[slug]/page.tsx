@@ -10,7 +10,6 @@ import { ViewTracker, HelpfulButton } from "@/components/Feedback";
 import BookmarkButton from "@/components/BookmarkButton";
 import ShareBar from "@/components/ShareBar";
 import StepChecklist from "@/components/StepChecklist";
-import MockScreenshot from "@/components/MockScreenshot";
 import { CopyStepsButton } from "@/components/Utilities";
 import ReportButton from "@/components/ReportButton";
 import Link from "next/link";
@@ -158,12 +157,16 @@ async function renderDetail(
             <BookmarkButton slug={slug} os={setting.os} title={setting.title} category={setting.category} />
           </div>
         </div>
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定場所</span>
-            <span className="no-print"><CopyPathButton path={setting.path} /></span>
-          </div>
-          <PathTrail path={setting.path} />
+        {/* 設定場所パスをコンパクトに表示（手順との重複を避けるためインラインに） */}
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>📍</span>
+          {setting.path.map((seg, i) => (
+            <span key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {i > 0 && <span style={{ color: "var(--text-muted)", fontSize: 12 }}>›</span>}
+              <span style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: i === setting.path.length - 1 ? 600 : 400 }}>{seg}</span>
+            </span>
+          ))}
+          <span className="no-print" style={{ marginLeft: "auto" }}><CopyPathButton path={setting.path} /></span>
         </div>
       </div>
 
@@ -178,13 +181,7 @@ async function renderDetail(
         </div>
       )}
 
-      {/* Mock screenshot */}
-      <div className="no-print" style={{ marginBottom: 14 }}>
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定画面イメージ</span>
-        </div>
-        <MockScreenshot os={setting.os} category={setting.category} path={setting.path} title={setting.title} />
-      </div>
+
 
       {/* Steps */}
       <div style={card}>
@@ -192,7 +189,7 @@ async function renderDetail(
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>手順</h2>
           <span className="no-print"><CopyStepsButton steps={setting.steps} path={setting.path} /></span>
         </div>
-        <StepChecklist steps={setting.steps} progressKey={progressKey} />
+        <StepChecklist steps={setting.steps} progressKey={progressKey} os={setting.os as OSType} />
       </div>
 
       {/* Helpful + report */}
