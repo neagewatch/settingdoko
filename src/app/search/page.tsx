@@ -1,118 +1,97 @@
-import { searchDB, getAllSettings } from "@/lib/data";
-import { OSType, OS_LABELS, CATEGORIES } from "@/lib/types";
-import SearchBox from "@/components/SearchBox";
-import SettingCard from "@/components/SettingCard";
-import Link from "next/link";
-import type { Metadata } from "next";
-import { searchSettings } from "@/lib/search";
+import Link from 'next/link';
+import type { Metadata } from 'next';
+import SearchBar from '@/components/SearchBar';
+import SettingCard from '@/components/SettingCard';
+import { searchSettingsData } from '@/lib/data';
+import { OS_LIST, APP_LIST } from '@/lib/os';
 
 type Props = { searchParams: Promise<{ q?: string; os?: string; diff?: string }> };
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const { q } = await searchParams;
   return {
-    title: q ? `「${q}」の検索結果` : "検索",
-    description: q ? `「${q}」に関する設定場所・手順の検索結果です。` : "PC・スマホの設定を検索",
-    robots: "noindex",
+    title: q ? `「${q}」の検索結果` : '検索',
+    robots: { index: false }, // 検索結果はnoindex
   };
 }
 
+const DIFFS = [
+  { id: '', label: 'すべての難易度' },
+  { id: 'beginner', label: '初心者' },
+  { id: 'intermediate', label: '中級' },
+  { id: 'advanced', label: '上級' },
+];
+
 export default async function SearchPage({ searchParams }: Props) {
-  const { q = "", os, diff } = await searchParams;
-  const osType = os as OSType | undefined;
-  let results = await searchDB(q, osType);
+  const { q = '', os = '', diff = '' } = await searchParams;
+  const results = q ? await searchSettingsData(q, os || undefined, diff || undefined) : [];
 
-  // 難易度フィルター
-  if (diff) results = results.filter((s) => s.difficulty === diff);
+  const buildUrl = (newOs: string, newDiff: string) => {
+    const p = new URLSearchParams();
+    if (q) p.set('q', q);
+    if (newOs) p.set('os', newOs);
+    if (newDiff) p.set('diff', newDiff);
+    return `/search?${p.toString()}`;
+  };
 
-  // ゼロヒット時の「もしかして」
-  let suggestions: Awaited<ReturnType<typeof searchDB>> = [];
-  if (q && results.length === 0) {
-    const all = await getAllSettings();
-    // クエリを短くして再検索
-    const shortQ = q.slice(0, Math.ceil(q.length / 2));
-    suggestions = searchSettings(all, shortQ, osType).slice(0, 4);
-  }
+  const chip = (isActive: boolean) =>
+    `px-3 py-1.5 rounded-full text-[13px] font-medium border transition-all whitespace-nowrap ${
+      isActive
+        ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
+        : 'bg-white border-[var(--line)] text-[var(--sub)] hover:border-slate-300'
+    }`;
 
   return (
-    <div style={{ padding: "32px 0 60px" }}>
-      <div style={{ marginBottom: 24 }}>
-        <SearchBox defaultValue={q} />
+    <div className="max-w-3xl mx-auto px-4 pt-7 pb-16">
+      <div className="mb-6"><SearchBar defaultValue={q} autoFocus={!q} /></div>
+
+      {/* OSフィルター */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-2 no-print">
+        <Link href={buildUrl('', diff)} className={chip(!os)}>すべて</Link>
+        {OS_LIST.map(o => (
+          <Link key={o.id} href={buildUrl(o.id, diff)} className={chip(os === o.id)}>{o.name}</Link>
+        ))}
+      </div>
+      {/* アプリフィルター（本番の欠落を修正） */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3 no-print">
+        {APP_LIST.map(a => (
+          <Link key={a.id} href={buildUrl(a.id, diff)} className={chip(os === a.id)}>{a.short}</Link>
+        ))}
+      </div>
+      {/* 難易度フィルター */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-7 no-print">
+        {DIFFS.map(d => (
+          <Link key={d.id} href={buildUrl(os, d.id)} className={chip(diff === d.id)}>{d.label}</Link>
+        ))}
       </div>
 
-      {/* フィルターバー */}
-      {q && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-          {/* OS filter */}
-          <Link href={`/search?q=${encodeURIComponent(q)}${diff ? `&diff=${diff}` : ""}`} className={`filter-chip ${!os ? "active" : ""}`}>すべてのOS</Link>
-          {(["windows11", "ios", "macos", "android"] as const).map((o) => (
-            <Link key={o} href={`/search?q=${encodeURIComponent(q)}&os=${o}${diff ? `&diff=${diff}` : ""}`} className={`filter-chip ${os === o ? "active" : ""}`}>
-              {OS_LABELS[o]}
-            </Link>
-          ))}
-          <div style={{ width: 1, height: 18, background: "var(--border)", margin: "0 4px" }} />
-          {/* Difficulty filter */}
-          <Link href={`/search?q=${encodeURIComponent(q)}${os ? `&os=${os}` : ""}`} className={`filter-chip ${!diff ? "active" : ""}`}>すべての難易度</Link>
-          {[["beginner","初心者"],["intermediate","中級"],["advanced","上級"]].map(([d, label]) => (
-            <Link key={d} href={`/search?q=${encodeURIComponent(q)}${os ? `&os=${os}` : ""}&diff=${d}`} className={`filter-chip ${diff === d ? "active" : ""}`}>
-              {label}
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {q && (
-        <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 20 }}>
-          「{q}」の検索結果：<strong style={{ color: "var(--text)" }}>{results.length}件</strong>
-        </p>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {results.length > 0
-          ? results.map((s) => <SettingCard key={s.id} setting={s} />)
-          : q
-          ? (
-            <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-muted)" }}>
-              <p style={{ fontSize: 40, marginBottom: 12 }}>🔍</p>
-              <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: "var(--text)" }}>
-                「{q}」は見つかりませんでした
-              </p>
-              <p style={{ fontSize: 14, marginBottom: 28 }}>別のキーワードで検索するか、OS一覧から探してみてください</p>
-
-              {suggestions.length > 0 && (
-                <div style={{ marginBottom: 32 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>
-                    もしかして…
-                  </p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 480, margin: "0 auto" }}>
-                    {suggestions.map((s) => (
-                      <Link key={s.id} href={`/setting/${s.slug}?os=${s.os}`} style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        padding: "12px 16px", borderRadius: 10,
-                        background: "var(--surface)", border: "1px solid var(--border)",
-                        textDecoration: "none", color: "var(--text)",
-                        transition: "border-color 0.15s",
-                      }}>
-                        <span style={{ fontSize: 13, background: "var(--primary-soft)", color: "var(--primary)", padding: "2px 8px", borderRadius: 6, fontWeight: 600, whiteSpace: "nowrap" }}>
-                          {OS_LABELS[s.os]}
-                        </span>
-                        <span style={{ fontSize: 14, fontWeight: 500 }}>{s.title}</span>
-                        <span style={{ marginLeft: "auto", color: "var(--text-muted)" }}>→</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                {(["windows11", "ios", "macos", "android"] as const).map((o) => (
-                  <Link key={o} href={`/os/${o}`} className="os-tab">{OS_LABELS[o]}</Link>
+      {q ? (
+        <>
+          <p className="text-[14px] text-[var(--sub)] mb-5">
+            「<span className="font-bold text-[var(--ink)]">{q}</span>」の検索結果: <span className="font-bold text-[var(--ink)]">{results.length}件</span>
+          </p>
+          {results.length > 0 ? (
+            <div className="space-y-3">
+              {results.map(s => <SettingCard key={`${s.os}-${s.slug}`} setting={s} />)}
+            </div>
+          ) : (
+            <div className="card p-10 text-center">
+              <p className="text-[var(--ink)] font-bold mb-2">見つかりませんでした</p>
+              <p className="text-[14px] text-[var(--sub)] mb-5">別のキーワードや言い換え（例:「消したい」→「オフ」）をお試しください</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {['Bluetooth', '明るさ', '通知', 'ミュート', '共有'].map(kw => (
+                  <Link key={kw} href={`/search?q=${encodeURIComponent(kw)}`}
+                    className="px-3.5 py-1.5 rounded-full bg-slate-50 border border-[var(--line)] text-[13px] text-[var(--sub)] hover:border-[var(--accent)] hover:text-[var(--accent)]">
+                    {kw}
+                  </Link>
                 ))}
               </div>
             </div>
-          )
-          : null}
-      </div>
+          )}
+        </>
+      ) : (
+        <p className="text-[14px] text-[var(--sub)]">キーワードを入力して検索してください。</p>
+      )}
     </div>
   );
 }

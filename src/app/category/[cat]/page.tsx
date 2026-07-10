@@ -1,81 +1,84 @@
-export const revalidate = 60;
-
-import { getAllSettings } from "@/lib/data";
-import { OS_LABELS, CATEGORIES } from "@/lib/types";
-import SettingCard from "@/components/SettingCard";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import type { Metadata } from 'next';
+import SettingCard from '@/components/SettingCard';
+import { fetchSettingsByCategory } from '@/lib/data';
+import { CATEGORIES, getCategory } from '@/lib/data/index';
+import { OS_LIST, APP_LIST, getOsInfo } from '@/lib/os';
 
 type Props = { params: Promise<{ cat: string }> };
 
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return CATEGORIES.map(c => ({ cat: c.id }));
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { cat } = await params;
-  const label = CATEGORIES[cat];
-  if (!label) return { title: "カテゴリ" };
+  const c = getCategory(cat);
+  if (!c) return { title: 'カテゴリが見つかりません' };
   return {
-    title: `${label}の設定一覧`,
-    description: `Windows・iPhone・Macの${label}に関する設定場所・手順を一覧で見られます。`,
+    title: `${c.name}の設定一覧`,
+    description: `${c.name}に関する設定場所と手順をOS・アプリ横断で確認できます。`,
+    alternates: { canonical: `/category/${cat}` },
   };
 }
 
 export default async function CategoryPage({ params }: Props) {
   const { cat } = await params;
-  if (!CATEGORIES[cat]) notFound();
+  const c = getCategory(cat);
+  if (!c) notFound();
 
-  const all = await getAllSettings();
-  const settings = all.filter((s) => s.category === cat);
-
-  // OS別にグループ化
-  const byOS: Record<string, typeof settings> = {};
-  for (const s of settings) {
-    if (!byOS[s.os]) byOS[s.os] = [];
-    byOS[s.os].push(s);
-  }
-
-  // 全カテゴリ一覧（ナビ用）
-  const allCats = [...new Set(all.map((s) => s.category))];
+  const settings = await fetchSettingsByCategory(cat);
+  // OS→アプリの順でグループ表示
+  const order = [...OS_LIST, ...APP_LIST].map(o => o.id);
+  const grouped: Record<string, typeof settings> = {};
+  settings.forEach(s => { (grouped[s.os] ||= []).push(s); });
 
   return (
-    <div style={{ padding: "32px 0 60px" }}>
-      <div style={{ marginBottom: 24, fontSize: 13, color: "var(--text-muted)", display: "flex", gap: 6 }}>
-        <Link href="/" style={{ color: "var(--text-muted)", textDecoration: "none" }}>トップ</Link>
-        <span>›</span>
-        <span style={{ color: "var(--text-secondary)" }}>{CATEGORIES[cat]}</span>
+    <div className="max-w-3xl mx-auto px-4 pt-7 pb-16">
+      <nav className="flex items-center gap-1.5 text-[13px] text-[var(--sub)] mb-6" aria-label="パンくず">
+        <Link href="/" className="hover:text-[var(--accent)]">トップ</Link>
+        <span className="text-slate-300">›</span>
+        <span className="text-[var(--ink)]">{c.name}</span>
+      </nav>
+
+      <div className="mb-8">
+        <h1 className="text-[26px] font-bold text-[var(--ink)] mb-1.5">{c.icon} {c.name}</h1>
+        <p className="text-[var(--sub)] text-[14px]">{settings.length}件の設定ガイド（OS・アプリ横断）</p>
       </div>
 
-      <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>{CATEGORIES[cat]}</h1>
-      <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 28 }}>{settings.length}件の設定ガイド</p>
-
-      {/* カテゴリ横断ナビ */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 36, overflowX: "auto" }}>
-        {allCats.map((c) => (
-          <Link key={c} href={`/category/${c}`} className={`filter-chip ${c === cat ? "active" : ""}`}>
-            {CATEGORIES[c] || c}
-          </Link>
-        ))}
+      <div className="space-y-10">
+        {order.map(osId => {
+          const items = grouped[osId];
+          if (!items?.length) return null;
+          const info = getOsInfo(osId);
+          return (
+            <section key={osId}>
+              <h2 className="flex items-center gap-2 text-[13px] font-semibold text-[var(--sub)] uppercase tracking-wider mb-4">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: info.color }} />
+                <span>{info.name}</span>
+              </h2>
+              <div className="space-y-3">
+                {items.map(s => <SettingCard key={s.slug} setting={s} />)}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
-      {/* OS別グループ */}
-      {Object.entries(byOS).map(([os, items]) => (
-        <div key={os} style={{ marginBottom: 40 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ padding: "3px 12px", borderRadius: 999, background: "var(--primary-soft)", color: "var(--primary)", fontSize: 13 }}>
-              {OS_LABELS[os]}
-            </span>
-            <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 400 }}>{items.length}件</span>
-          </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {items.map((s) => <SettingCard key={s.id} setting={s} />)}
-          </div>
+      <div className="mt-12 pt-6 border-t border-[var(--line)]">
+        <p className="text-[13px] font-semibold text-[var(--sub)] uppercase tracking-wider mb-3">他のカテゴリ</p>
+        <div className="flex flex-wrap gap-2">
+          {CATEGORIES.filter(x => x.id !== cat).slice(0, 12).map(x => (
+            <Link key={x.id} href={`/category/${x.id}`}
+              className="px-3.5 py-1.5 rounded-full bg-white border border-[var(--line)] text-[13px] text-[var(--sub)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all">
+              {x.icon} {x.name}
+            </Link>
+          ))}
         </div>
-      ))}
-
-      {settings.length === 0 && (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-muted)" }}>
-          <p>このカテゴリの設定はまだありません</p>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

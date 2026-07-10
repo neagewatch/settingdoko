@@ -1,123 +1,78 @@
-import { getSettingsByOS } from "@/lib/data";
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import type { Metadata } from 'next';
+import SearchBar from '@/components/SearchBar';
+import SettingCard from '@/components/SettingCard';
+import { fetchSettingsByOs } from '@/lib/data';
+import { getOsInfo, ALL_TARGETS } from '@/lib/os';
+import { CATEGORIES } from '@/lib/data/index';
 
-export const revalidate = 60; // 60秒ごとに再生成
-import { OSType, OS_LABELS, CATEGORIES } from "@/lib/types";
-import SettingCard from "@/components/SettingCard";
-import SearchBox from "@/components/SearchBox";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
+type Props = { params: Promise<{ os: string }> };
 
-type Props = {
-  params: Promise<{ os: string }>;
-};
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return ALL_TARGETS.map(t => ({ os: t.id }));
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { os } = await params;
-  const label = OS_LABELS[os];
-  if (!label) return { title: "OS Not Found" };
+  const info = getOsInfo(os);
   return {
-    title: `${label}の設定一覧`,
-    description: `${label}の設定場所・手順を一覧で検索できます。`,
+    title: `${info.name}の設定一覧`,
+    description: `${info.name}の設定場所と手順を一覧で確認できます。`,
+    alternates: { canonical: `/os/${os}` },
   };
 }
 
-export default async function OSPage({ params }: Props) {
+export default async function OsPage({ params }: Props) {
   const { os } = await params;
-  const osType = os as OSType;
+  if (!ALL_TARGETS.some(t => t.id === os)) notFound();
 
-  if (!OS_LABELS[osType]) notFound();
+  const info = getOsInfo(os);
+  const settings = await fetchSettingsByOs(os);
 
-  const settings = await getSettingsByOS(osType);
-
-  // Group by category
   const grouped: Record<string, typeof settings> = {};
-  for (const s of settings) {
-    const cat = s.category;
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(s);
-  }
+  settings.forEach(s => {
+    const c = s.category || 'other';
+    (grouped[c] ||= []).push(s);
+  });
 
   return (
-    <div style={{ padding: "32px 0" }}>
-      {/* Breadcrumb */}
-      <div style={{ marginBottom: 24 }}>
-        <Link
-          href="/"
-          style={{
-            fontSize: 13,
-            color: "var(--text-muted)",
-            textDecoration: "none",
-          }}
-        >
-          トップ
-        </Link>
-        <span style={{ margin: "0 8px", color: "var(--text-muted)" }}>›</span>
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-          {OS_LABELS[osType]}
-        </span>
-      </div>
+    <div className="max-w-3xl mx-auto px-4 pt-7 pb-16">
+      <nav className="flex items-center gap-1.5 text-[13px] text-[var(--sub)] mb-6" aria-label="パンくず">
+        <Link href="/" className="hover:text-[var(--accent)]">トップ</Link>
+        <span className="text-slate-300">›</span>
+        <span className="text-[var(--ink)]">{info.name}</span>
+      </nav>
 
-      <h1
-        style={{
-          fontSize: 26,
-          fontWeight: 700,
-          marginBottom: 8,
-          letterSpacing: "-0.01em",
-        }}
-      >
-        {OS_LABELS[osType]} の設定
-      </h1>
-      <p
-        style={{
-          fontSize: 15,
-          color: "var(--text-secondary)",
-          marginBottom: 28,
-        }}
-      >
-        {settings.length}件の設定ガイド
-      </p>
-
-      {/* OS switcher */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 32 }}>
-        {(["windows11", "ios", "macos", "android"] as const).map((o) => (
-          <Link
-            key={o}
-            href={`/os/${o}`}
-            className={`os-tab ${o === osType ? "active" : ""}`}
-            style={{ textDecoration: "none" }}
-          >
-            {OS_LABELS[o]}
-          </Link>
-        ))}
-      </div>
-
-      {/* Grouped settings */}
-      {Object.entries(grouped).map(([category, items]) => (
-        <div key={category} style={{ marginBottom: 36 }}>
-          <h2
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              marginBottom: 14,
-              paddingBottom: 8,
-              borderBottom: "1px solid var(--border)",
-            }}
-          >
-            {CATEGORIES[category] || category}
-          </h2>
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: 10 }}
-          >
-            {items.map((s) => (
-              <SettingCard key={s.id} setting={s} />
-            ))}
-          </div>
+      <div className="mb-7">
+        <div className="flex items-center gap-3 mb-1.5">
+          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: info.color }} />
+          <h1 className="text-[26px] font-bold text-[var(--ink)]">{info.name} の設定</h1>
         </div>
-      ))}
+        <p className="text-[var(--sub)] text-[14px]">{settings.length}件の設定ガイド{info.tagline ? ` — ${info.tagline}` : ''}</p>
+      </div>
+
+      <div className="mb-9"><SearchBar /></div>
+
+      <div className="space-y-10">
+        {CATEGORIES.map(cat => {
+          const items = grouped[cat.id];
+          if (!items?.length) return null;
+          return (
+            <section key={cat.id} id={cat.id}>
+              <h2 className="flex items-center gap-2 text-[13px] font-semibold text-[var(--sub)] uppercase tracking-wider mb-4">
+                <span>{cat.icon}</span><span>{cat.name}</span>
+                <span className="text-slate-300 font-normal">{items.length}</span>
+              </h2>
+              <div className="space-y-3">
+                {items.map(s => <SettingCard key={s.slug} setting={s} />)}
+              </div>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -1,92 +1,54 @@
-import { getAllSettings } from "@/lib/data";
-import { OS_LABELS, CATEGORIES } from "@/lib/types";
-import Link from "next/link";
-import AdminClient from "./AdminClient";
-import AdminAuth from "./AdminAuth";
-import { cookies } from "next/headers";
-import type { Metadata } from "next";
+import type { Metadata } from 'next';
+import { fetchAllSettings } from '@/lib/data';
+import { ALL_TARGETS, getOsInfo } from '@/lib/os';
+import { getCategory } from '@/lib/data/index';
 
-export const revalidate = 0; // 常に最新を取得
-export const metadata: Metadata = { title: "管理画面", robots: "noindex" };
+export const metadata: Metadata = {
+  title: '管理画面',
+  robots: { index: false, follow: false },
+};
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "settingdoko2024";
-
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ auth?: string }>;
-}) {
-  const params = await searchParams;
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get("admin_auth");
-  const isAuthed = authCookie?.value === ADMIN_PASSWORD || params.auth === ADMIN_PASSWORD;
-
-  if (!isAuthed) {
-    return <AdminAuth />;
-  }
-
-  const settings = await getAllSettings();
-  const osCount: Record<string, number> = {};
-  const catCount: Record<string, number> = {};
-  for (const s of settings) {
-    osCount[s.os] = (osCount[s.os] || 0) + 1;
-    catCount[s.category] = (catCount[s.category] || 0) + 1;
-  }
+export default async function AdminPage() {
+  const settings = await fetchAllSettings();
+  const grouped: Record<string, typeof settings> = {};
+  settings.forEach(s => { (grouped[s.os] ||= []).push(s); });
 
   return (
-    <div style={{ padding: "32px 0 80px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>管理画面</h1>
-          <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 4 }}>全{settings.length}件の設定データ</p>
-        </div>
-      </div>
+    <div className="max-w-5xl mx-auto px-4 pt-8 pb-16">
+      <h1 className="text-2xl font-bold text-[var(--ink)] mb-1">管理画面（データ一覧）</h1>
+      <p className="text-[var(--sub)] text-sm mb-8">全{settings.length}件 — 追加・編集はSupabaseダッシュボードまたはシードSQLで行います</p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 32 }}>
-        {Object.entries(osCount).map(([os, count]) => (
-          <div key={os} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "16px 20px" }}>
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{OS_LABELS[os] || os}</p>
-            <p style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>{count}</p>
-          </div>
-        ))}
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "16px 20px" }}>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>カテゴリ数</p>
-          <p style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>{Object.keys(catCount).length}</p>
-        </div>
-      </div>
-
-      <AdminClient settings={settings} />
-
-      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden", marginTop: 32 }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>設定データ一覧</h2>
-        </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}>
-                {["タイトル", "OS", "カテゴリ", "手順数", "alias数"].map((h) => (
-                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {settings.map((s) => (
-                <tr key={s.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                  <td style={{ padding: "10px 16px" }}>
-                    <Link href={`/setting/${s.slug}?os=${s.os}`} style={{ color: "var(--primary)", textDecoration: "none", fontWeight: 500 }}>{s.title}</Link>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{s.path.join(" › ")}</div>
-                  </td>
-                  <td style={{ padding: "10px 16px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{OS_LABELS[s.os] || s.os}</td>
-                  <td style={{ padding: "10px 16px", color: "var(--text-secondary)" }}>{CATEGORIES[s.category] || s.category}</td>
-                  <td style={{ padding: "10px 16px", color: "var(--text-secondary)", textAlign: "center" }}>{s.steps.length}</td>
-                  <td style={{ padding: "10px 16px", color: "var(--text-secondary)", textAlign: "center" }}>{s.aliases.length}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {ALL_TARGETS.map(t => {
+        const items = grouped[t.id];
+        if (!items?.length) return null;
+        return (
+          <section key={t.id} className="mb-8">
+            <h2 className="font-bold text-[var(--ink)] mb-3">{t.name}（{items.length}件）</h2>
+            <div className="card overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="border-b border-[var(--line)] text-left text-[var(--sub)]">
+                    <th className="px-4 py-2.5 font-medium">タイトル</th>
+                    <th className="px-4 py-2.5 font-medium">slug</th>
+                    <th className="px-4 py-2.5 font-medium">カテゴリ</th>
+                    <th className="px-4 py-2.5 font-medium">難易度</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map(s => (
+                    <tr key={s.slug} className="border-b border-[var(--line)] last:border-0">
+                      <td className="px-4 py-2.5 text-[var(--ink)]">{s.title}</td>
+                      <td className="px-4 py-2.5 text-[var(--sub)] font-mono text-[12px]">{s.slug}</td>
+                      <td className="px-4 py-2.5 text-[var(--sub)]">{getCategory(s.category)?.name || '-'}</td>
+                      <td className="px-4 py-2.5 text-[var(--sub)]">{s.difficulty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

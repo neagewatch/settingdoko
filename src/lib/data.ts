@@ -1,108 +1,100 @@
-import { supabase } from "./supabase";
-import { Setting, OSType } from "./types";
-import { allSampleSettings } from "./sample-data-export";
-import { searchSettings } from "./search";
+import { supabase, Setting, Category } from './supabase';
+import { ALL_SETTINGS, CATEGORIES } from './data/index';
 
-// supabaseがnullの場合はサンプルデータで動作
-const USE_SUPABASE = supabase !== null;
+// Supabase未接続時はローカルデータで動作
+const useLocal = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('supabase');
 
-function withIds(items: typeof allSampleSettings): Setting[] {
-  return items.map((item, i) => ({
-    ...item,
-    id: `sample-${i.toString().padStart(4, "0")}`,
-    updated_at: new Date(Date.now() - i * 3600000).toISOString(),
-  }));
+export async function fetchCategories(): Promise<Category[]> {
+  return CATEGORIES;
 }
 
-export async function getAllSettings(): Promise<Setting[]> {
-  if (USE_SUPABASE) {
-    const { data, error } = await supabase!
-      .from("settings").select("*").order("updated_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-  }
-  return withIds(allSampleSettings);
+function normalize(q: string): string {
+  return q.toLowerCase().normalize('NFKC');
 }
 
-export async function getSettingBySlugAndOS(slug: string, os: OSType): Promise<Setting | null> {
-  if (USE_SUPABASE) {
-    const { data, error } = await supabase!
-      .from("settings").select("*").eq("slug", slug).eq("os", os).single();
-    if (error) return null;
-    return data;
-  }
-  return withIds(allSampleSettings).find((s) => s.slug === slug && s.os === os) || null;
+export function searchLocal(query: string, osFilter?: string, diffFilter?: string): Setting[] {
+  const q = normalize(query);
+  const scored = ALL_SETTINGS
+    .filter(s => s.is_published)
+    .filter(s => !osFilter || s.os === osFilter)
+    .filter(s => !diffFilter || s.difficulty === diffFilter)
+    .map(s => {
+      let score = 0;
+      const title = normalize(s.title);
+      if (title === q) score += 100;
+      else if (title.includes(q)) score += 50;
+      if (s.aliases.some(a => normalize(a).includes(q))) score += 30;
+      if (s.keywords.some(k => normalize(k).includes(q))) score += 20;
+      if (normalize(s.description || '').includes(q)) score += 10;
+      if (s.path.some(p => normalize(p).includes(q))) score += 5;
+      return { s, score };
+    })
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+  return scored.map(x => x.s);
 }
 
-export async function getSettingsBySlug(slug: string): Promise<Setting[]> {
-  if (USE_SUPABASE) {
-    const { data, error } = await supabase!
-      .from("settings").select("*").eq("slug", slug);
-    if (error) return [];
-    return data || [];
-  }
-  return withIds(allSampleSettings).filter((s) => s.slug === slug);
+export async function searchSettingsData(query: string, osFilter?: string, diffFilter?: string): Promise<Setting[]> {
+  if (useLocal) return searchLocal(query, osFilter, diffFilter);
+  const { data } = await supabase.rpc('search_settings', {
+    search_query: query, os_filter: osFilter || null,
+  });
+  let results = (data as Setting[]) || [];
+  if (diffFilter) results = results.filter(s => s.difficulty === diffFilter);
+  return results;
 }
 
-export async function getSettingsByOS(os: OSType): Promise<Setting[]> {
-  if (USE_SUPABASE) {
-    const { data, error } = await supabase!
-      .from("settings").select("*").eq("os", os).order("category");
-    if (error) return [];
-    return data || [];
-  }
-  return withIds(allSampleSettings).filter((s) => s.os === os);
+export async function fetchSettingBySlugAndOs(slug: string, os: string): Promise<Setting | null> {
+  if (useLocal) return ALL_SETTINGS.find(s => s.slug === slug && s.os === os && s.is_published) || null;
+  const { data } = await supabase.from('settings').select('*')
+    .eq('slug', slug).eq('os', os).eq('is_published', true).single();
+  return data as Setting | null;
 }
 
-export async function searchDB(query: string, os?: OSType): Promise<Setting[]> {
-  if (USE_SUPABASE) {
-    let q = supabase!.from("settings").select("*");
-    if (os) q = q.eq("os", os);
-    const { data, error } = await q;
-    if (error) return [];
-    return searchSettings(data || [], query, os);
-  }
-  return searchSettings(withIds(allSampleSettings), query, os);
+export async function fetchSettingBySlug(slug: string): Promise<Setting | null> {
+  if (useLocal) return ALL_SETTINGS.find(s => s.slug === slug && s.is_published) || null;
+  const { data } = await supabase.from('settings').select('*')
+    .eq('slug', slug).eq('is_published', true).limit(1).single();
+  return data as Setting | null;
 }
 
-export async function getRelatedSettings(relatedSlugs: string[], currentId: string): Promise<Setting[]> {
-  if (!relatedSlugs.length) return [];
-  if (USE_SUPABASE) {
-    const { data, error } = await supabase!
-      .from("settings").select("*").in("slug", relatedSlugs).neq("id", currentId);
-    if (error) return [];
-    return data || [];
-  }
-  return withIds(allSampleSettings).filter(
-    (s) => relatedSlugs.includes(s.slug) && s.id !== currentId
+export async function fetchSettingsByOs(os: string): Promise<Setting[]> {
+  if (useLocal) return ALL_SETTINGS.filter(s => s.os === os && s.is_published);
+  const { data } = await supabase.from('settings').select('*')
+    .eq('os', os).eq('is_published', true).order('category').order('title');
+  return (data as Setting[]) || [];
+}
+
+export async function fetchSettingsByCategory(cat: string): Promise<Setting[]> {
+  if (useLocal) return ALL_SETTINGS.filter(s => s.category === cat && s.is_published);
+  const { data } = await supabase.from('settings').select('*')
+    .eq('category', cat).eq('is_published', true).order('os').order('title');
+  return (data as Setting[]) || [];
+}
+
+export async function fetchRelatedSettings(setting: Setting): Promise<Setting[]> {
+  if (useLocal) return ALL_SETTINGS.filter(
+    s => setting.related_slugs.includes(s.slug) && s.is_published
   );
+  if (!setting.related_slugs.length) return [];
+  const { data } = await supabase.from('settings').select('*')
+    .in('slug', setting.related_slugs).eq('is_published', true);
+  return (data as Setting[]) || [];
 }
 
-// ===== 管理画面用 CRUD =====
-
-export async function createSetting(data: Omit<Setting, "id" | "updated_at">): Promise<Setting | null> {
-  if (!USE_SUPABASE) return null;
-  const { data: result, error } = await supabase!.from("settings").insert([data]).select().single();
-  if (error) throw error;
-  return result;
+export async function fetchAllSettings(): Promise<Setting[]> {
+  if (useLocal) return ALL_SETTINGS;
+  const { data } = await supabase.from('settings').select('*').order('os').order('title');
+  return (data as Setting[]) || [];
 }
 
-export async function updateSetting(id: string, data: Partial<Omit<Setting, "id">>): Promise<Setting | null> {
-  if (!USE_SUPABASE) return null;
-  const { data: result, error } = await supabase!.from("settings").update(data).eq("id", id).select().single();
-  if (error) throw error;
-  return result;
-}
-
-export async function deleteSetting(id: string): Promise<void> {
-  if (!USE_SUPABASE) return;
-  const { error } = await supabase!.from("settings").delete().eq("id", id);
-  if (error) throw error;
-}
-
-export async function getSettingById(id: string): Promise<Setting | null> {
-  if (!USE_SUPABASE) return null;
-  const { data, error } = await supabase!.from("settings").select("*").eq("id", id).single();
-  if (error) return null;
-  return data;
+// 同一OS内での前後ナビ用
+export async function fetchPrevNext(setting: Setting): Promise<{ prev: Setting | null; next: Setting | null }> {
+  const list = await fetchSettingsByOs(setting.os);
+  const idx = list.findIndex(s => s.slug === setting.slug);
+  return {
+    prev: idx > 0 ? list[idx - 1] : null,
+    next: idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null,
+  };
 }
