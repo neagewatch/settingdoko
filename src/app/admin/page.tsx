@@ -3,6 +3,7 @@ import { OS_LABELS, CATEGORIES } from "@/lib/types";
 import Link from "next/link";
 import AdminClient from "./AdminClient";
 import AdminAuth from "./AdminAuth";
+import AdminLogoutButton from "./AdminLogoutButton";
 import { isAdminAuthenticated, isMfaLoginAvailable, passwordLoginEnabled } from "@/lib/admin-auth";
 import type { Metadata } from "next";
 
@@ -36,6 +37,7 @@ export default async function AdminPage({
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>管理画面</h1>
           <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 4 }}>全{settings.length}件の設定データ</p>
         </div>
+        <AdminLogoutButton />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 32 }}>
