@@ -121,6 +121,8 @@ export function SettingEditorModal({
       keywords: parseLines(keywordsText),
       related_slugs: parseLines(form.related_slugs?.join("\n") || ""),
     };
+    // 追加列のSQL実行前でも、従来の記事編集を止めない。
+    if (!payload.source_url) delete payload.source_url;
     try {
       const res = await fetch("/api/settings", {
         method: isNew ? "POST" : "PUT",
