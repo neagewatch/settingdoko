@@ -439,12 +439,16 @@ const windowsSettings = [
     description:"アプリのバックグラウンド実行を制限してバッテリーとCPUを節約する方法です。"},
 ];
 
+export { windowsSettings };
+
+
 function pgArr(arr) {
   if (!arr || arr.length === 0) return "ARRAY[]::text[]";
   return "ARRAY[" + arr.map(s => `'${s.replace(/'/g,"''")}'`).join(",") + "]";
 }
 function pgStr(s) { return s ? `'${s.replace(/'/g,"''")}'` : "NULL"; }
 
+function printSql() {
 console.log("-- ==============================================");
 console.log("-- 設定どこ？ - Windows 11 追加データ");
 console.log(`-- ${windowsSettings.length}件`);
@@ -467,3 +471,6 @@ console.log("  related_slugs=EXCLUDED.related_slugs,keywords=EXCLUDED.keywords,"
 console.log("  description=EXCLUDED.description,updated_at=NOW();");
 console.log("");
 console.log("SELECT os, count(*) FROM settings GROUP BY os ORDER BY os;");
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) printSql();

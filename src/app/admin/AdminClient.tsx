@@ -22,6 +22,7 @@ export default function AdminClient({ settings: initialSettings, contentRequests
   const [filterCat, setFilterCat] = useState("");
   const [filterQ, setFilterQ] = useState("");
   const [activeTab, setActiveTab] = useState<"data" | "analytics" | "ai" | "reports" | "requests">("data");
+  const [importingWindows, setImportingWindows] = useState(false);
 
   // AI Assist
   const [aiTitle, setAiTitle] = useState("");
@@ -62,6 +63,19 @@ export default function AdminClient({ settings: initialSettings, contentRequests
       setAiResult(data);
     } catch { setAiError("エラーが発生しました"); }
     finally { setAiLoading(false); }
+  }
+
+  async function importWindowsPack() {
+    if (!confirm("Windows 11記事53件を追加・更新します。既存記事は削除されません。続けますか？")) return;
+    setImportingWindows(true);
+    try {
+      const response = await fetch("/api/admin/import-windows", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "投入に失敗しました");
+      alert(`Windows記事 ${data.count}件を投入しました`);
+      window.location.reload();
+    } catch (error) { alert(error instanceof Error ? error.message : "投入に失敗しました"); }
+    finally { setImportingWindows(false); }
   }
 
   const filtered = settings.filter((s) =>
@@ -109,6 +123,9 @@ export default function AdminClient({ settings: initialSettings, contentRequests
               style={{ padding: "8px 18px", borderRadius: 8, background: "var(--primary)", color: "white", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
             >
               ＋ 新規追加
+            </button>
+            <button onClick={importWindowsPack} disabled={importingWindows} style={{ padding: "8px 14px", borderRadius: 8, background: "var(--surface-2)", color: "var(--text)", border: "1px solid var(--border)", cursor: importingWindows ? "wait" : "pointer", fontSize: 13, fontWeight: 600 }}>
+              {importingWindows ? "投入中…" : "Windows記事53件を投入"}
             </button>
           </div>
 
