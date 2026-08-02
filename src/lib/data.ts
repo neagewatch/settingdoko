@@ -65,6 +65,10 @@ function normalizeSetting(setting: Setting): Setting {
   };
 }
 
+function publishedOnly(settings: Setting[]): Setting[] {
+  return settings.filter((setting) => setting.status !== "draft");
+}
+
 function withIds(items: typeof allSampleSettings): Setting[] {
   return items.map((item, i) => ({
     ...item,
@@ -73,12 +77,13 @@ function withIds(items: typeof allSampleSettings): Setting[] {
   }));
 }
 
-export async function getAllSettings(): Promise<Setting[]> {
+export async function getAllSettings(includeDrafts = false): Promise<Setting[]> {
   if (USE_SUPABASE) {
     const { data, error } = await supabase!
       .from("settings").select("*").order("updated_at", { ascending: false });
     if (error) throw error;
-    return (data || []).map(normalizeSetting);
+    const settings = (data || []).map(normalizeSetting);
+    return includeDrafts ? settings : publishedOnly(settings);
   }
   return withIds(allSampleSettings);
 }
@@ -88,7 +93,8 @@ export async function getSettingBySlugAndOS(slug: string, os: OSType): Promise<S
     const { data, error } = await supabase!
       .from("settings").select("*").eq("slug", slug).eq("os", os).single();
     if (error) return null;
-    return normalizeSetting(data);
+    const setting = normalizeSetting(data);
+    return setting.status === "draft" ? null : setting;
   }
   return withIds(allSampleSettings).find((s) => s.slug === slug && s.os === os) || null;
 }
@@ -98,7 +104,7 @@ export async function getSettingsBySlug(slug: string): Promise<Setting[]> {
     const { data, error } = await supabase!
       .from("settings").select("*").eq("slug", slug);
     if (error) return [];
-    return (data || []).map(normalizeSetting);
+    return publishedOnly((data || []).map(normalizeSetting));
   }
   return withIds(allSampleSettings).filter((s) => s.slug === slug);
 }
@@ -108,7 +114,7 @@ export async function getSettingsByOS(os: OSType): Promise<Setting[]> {
     const { data, error } = await supabase!
       .from("settings").select("*").eq("os", os).order("category");
     if (error) return [];
-    return (data || []).map(normalizeSetting);
+    return publishedOnly((data || []).map(normalizeSetting));
   }
   return withIds(allSampleSettings).filter((s) => s.os === os);
 }
@@ -119,7 +125,7 @@ export async function searchDB(query: string, os?: OSType): Promise<Setting[]> {
     if (os) q = q.eq("os", os);
     const { data, error } = await q;
     if (error) return [];
-    return searchSettings((data || []).map(normalizeSetting), query, os);
+    return searchSettings(publishedOnly((data || []).map(normalizeSetting)), query, os);
   }
   return searchSettings(withIds(allSampleSettings), query, os);
 }
@@ -130,7 +136,7 @@ export async function getRelatedSettings(relatedSlugs: string[], currentId: stri
     const { data, error } = await supabase!
       .from("settings").select("*").in("slug", relatedSlugs).neq("id", currentId);
     if (error) return [];
-    return (data || []).map(normalizeSetting);
+    return publishedOnly((data || []).map(normalizeSetting));
   }
   return withIds(allSampleSettings).filter(
     (s) => relatedSlugs.includes(s.slug) && s.id !== currentId

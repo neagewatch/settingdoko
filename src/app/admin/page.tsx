@@ -21,7 +21,7 @@ export default async function AdminPage({
     return <AdminAuth mfaAvailable={isMfaLoginAvailable()} passwordEnabled={passwordLoginEnabled()} />;
   }
 
-  const [settings, contentRequests] = await Promise.all([getAllSettings(), getContentRequests()]);
+  const [settings, contentRequests] = await Promise.all([getAllSettings(true), getContentRequests()]);
   const osCount: Record<string, number> = {};
   const catCount: Record<string, number> = {};
   for (const s of settings) {
