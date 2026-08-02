@@ -8,6 +8,7 @@ const EMPTY: Omit<Setting, "id" | "updated_at"> = {
   difficulty: "beginner", estimate_minutes: 2,
   aliases: [], path: [], steps: [], related_slugs: [], keywords: [],
   description: "", screenshot_url: "",
+  status: "published", published_at: null, verified_at: null, editor_note: "",
 };
 
 function parseLines(text: string): string[] {
@@ -42,7 +43,9 @@ export function SettingEditorModal({
           category: setting.category, difficulty: setting.difficulty, estimate_minutes: setting.estimate_minutes,
           aliases: setting.aliases, path: setting.path, steps: setting.steps,
           related_slugs: setting.related_slugs, keywords: setting.keywords,
-          description: setting.description, screenshot_url: setting.screenshot_url || "" }
+          description: setting.description, screenshot_url: setting.screenshot_url || "",
+          status: setting.status || "published", published_at: setting.published_at || null,
+          verified_at: setting.verified_at || null, editor_note: setting.editor_note || "" }
       : { ...EMPTY }
   );
   const [aliasText, setAliasText] = useState(toLines(setting?.aliases || []));
@@ -177,6 +180,20 @@ export function SettingEditorModal({
           <div style={{ gridColumn: "1/-1" }}>
             <label style={label}>説明文 *</label>
             <textarea style={textarea} rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+          </div>
+          <div>
+            <label style={label}>公開状態</label>
+            <select style={inp} value={form.status || "published"} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "draft" | "published" }))}>
+              <option value="published">公開</option><option value="draft">下書き</option>
+            </select>
+          </div>
+          <div>
+            <label style={label}>最終検証日</label>
+            <input style={inp} type="date" value={form.verified_at ? form.verified_at.slice(0, 10) : ""} onChange={(e) => setForm((f) => ({ ...f, verified_at: e.target.value ? new Date(`${e.target.value}T00:00:00Z`).toISOString() : null }))} />
+          </div>
+          <div style={{ gridColumn: "1/-1" }}>
+            <label style={label}>編集メモ（公開ページには表示されません）</label>
+            <textarea style={textarea} rows={2} value={form.editor_note || ""} onChange={(e) => setForm((f) => ({ ...f, editor_note: e.target.value }))} placeholder="確認したOSバージョン、更新理由、次回見直し内容など" />
           </div>
           <div style={{ gridColumn: "1/-1" }}>
             <label style={label}>設定導線（1行1ステップ）*</label>

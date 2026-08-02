@@ -38,6 +38,10 @@ export interface Setting {
   difficulty?: Difficulty;
   estimate_minutes?: number;
   screenshot_url?: string; // 追加：スクリーンショット画像URL
+  status?: "draft" | "published";
+  published_at?: string | null;
+  verified_at?: string | null;
+  editor_note?: string | null;
 }
 
 export const OS_LABELS: Record<string, string> = {

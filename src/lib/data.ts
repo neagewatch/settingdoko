@@ -12,6 +12,7 @@ export interface ContentRequest {
   status: "new" | "reviewing" | "done";
   created_at: string;
 }
+export interface SettingRevision { id: string; setting_id: string; snapshot: Setting; created_at: string; }
 
 // supabaseがnullの場合はサンプルデータで動作
 const USE_SUPABASE = supabase !== null;
@@ -140,14 +141,20 @@ export async function getRelatedSettings(relatedSlugs: string[], currentId: stri
 
 export async function createSetting(data: Omit<Setting, "id" | "updated_at">): Promise<Setting | null> {
   if (!USE_SUPABASE) return null;
-  const { data: result, error } = await supabase!.from("settings").insert([data]).select().single();
+  const db = serverSupabase || supabase!;
+  const { data: result, error } = await db.from("settings").insert([data]).select().single();
   if (error) throw error;
   return normalizeSetting(result);
 }
 
 export async function updateSetting(id: string, data: Partial<Omit<Setting, "id">>): Promise<Setting | null> {
   if (!USE_SUPABASE) return null;
-  const { data: result, error } = await supabase!.from("settings").update(data).eq("id", id).select().single();
+  const db = serverSupabase || supabase!;
+  if (serverSupabase) {
+    const { data: previous } = await db.from("settings").select("*").eq("id", id).single();
+    if (previous) await db.from("setting_revisions").insert({ setting_id: id, snapshot: previous });
+  }
+  const { data: result, error } = await db.from("settings").update(data).eq("id", id).select().single();
   if (error) throw error;
   return normalizeSetting(result);
 }
@@ -173,4 +180,10 @@ export async function getContentRequests(): Promise<ContentRequest[]> {
     .order("created_at", { ascending: false })
     .limit(100);
   return error ? [] : (data || []) as ContentRequest[];
+}
+
+export async function getSettingRevisions(settingId: string): Promise<SettingRevision[]> {
+  if (!serverSupabase) return [];
+  const { data, error } = await serverSupabase.from("setting_revisions").select("id, setting_id, snapshot, created_at").eq("setting_id", settingId).order("created_at", { ascending: false }).limit(20);
+  return error ? [] : (data || []) as SettingRevision[];
 }
