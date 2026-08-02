@@ -68,6 +68,9 @@ export default async function Home() {
             <Link key={item.q} href={`/search?q=${encodeURIComponent(item.q)}`} className="filter-chip">{item.label}</Link>
           ))}
         </div>
+        <div style={{ textAlign: "center", marginTop: 14 }}>
+          <Link href="/diagnose" style={{ fontSize: 13, color: "var(--primary)", textDecoration: "none", fontWeight: 600 }}>うまくいかない時は、症状から診断する →</Link>
+        </div>
       </div>
 
       {/* Popular searches */}
@@ -107,8 +110,8 @@ export default async function Home() {
         <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
           OSから探す
         </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-          {(["windows11", "ios", "macos"] as const).map((os) => (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
+          {(["windows11", "ios", "macos", "android"] as const).map((os) => (
             <Link key={os} href={`/os/${os}`} style={{
               background: "var(--surface)", border: "1px solid var(--border)",
               borderRadius: "var(--radius)", padding: "18px 20px",

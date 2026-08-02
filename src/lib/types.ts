@@ -42,6 +42,7 @@ export interface Setting {
   published_at?: string | null;
   verified_at?: string | null;
   editor_note?: string | null;
+  source_url?: string | null;
 }
 
 export const OS_LABELS: Record<string, string> = {

@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { OS_LABELS, OSType } from "@/lib/types";
 
-const OS_LIST: OSType[] = ["windows11", "ios", "macos"];
+const OS_LIST: OSType[] = ["windows11", "ios", "macos", "android"];
 
 export default function OSTabs({
   current,

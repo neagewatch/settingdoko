@@ -1,4 +1,4 @@
-import { getAllSettings, getContentRequests } from "@/lib/data";
+import { getAllSettings, getContentRequests, getContentReports } from "@/lib/data";
 import { OS_LABELS, CATEGORIES } from "@/lib/types";
 import Link from "next/link";
 import AdminClient from "./AdminClient";
@@ -22,7 +22,7 @@ export default async function AdminPage({
     return <AdminAuth mfaAvailable={isMfaLoginAvailable()} passwordEnabled={passwordLoginEnabled()} />;
   }
 
-  const [settings, contentRequests] = await Promise.all([getAllSettings(true), getContentRequests()]);
+  const [settings, contentRequests, contentReports] = await Promise.all([getAllSettings(true), getContentRequests(), getContentReports()]);
   const osCount: Record<string, number> = {};
   const catCount: Record<string, number> = {};
   for (const s of settings) {
@@ -53,7 +53,7 @@ export default async function AdminPage({
         </div>
       </div>
 
-      <AdminClient settings={settings} contentRequests={contentRequests} />
+      <AdminClient settings={settings} contentRequests={contentRequests} contentReports={contentReports} />
 
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden", marginTop: 32 }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>

@@ -6,21 +6,18 @@ export default function ReportButton({ settingId, title }: { settingId: string; 
   const [sent, setSent] = useState(false);
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState("");
+  const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
 
   async function handleSubmit() {
-    // localStorageに報告を記録（管理画面で確認できる）
+    setSending(true); setError("");
     try {
-      const reports = JSON.parse(localStorage.getItem("sdoko_reports") || "[]");
-      reports.unshift({
-        id: settingId,
-        title,
-        comment,
-        timestamp: Date.now(),
-      });
-      localStorage.setItem("sdoko_reports", JSON.stringify(reports.slice(0, 50)));
-    } catch {}
-    setSent(true);
-    setOpen(false);
+      const response = await fetch("/api/content-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ settingId, title, comment }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "送信できませんでした");
+      setSent(true); setOpen(false);
+    } catch (e) { setError(e instanceof Error ? e.message : "送信できませんでした"); }
+    finally { setSending(false); }
   }
 
   if (sent) {
@@ -70,13 +67,13 @@ export default function ReportButton({ settingId, title }: { settingId: string; 
               >
                 キャンセル
               </button>
-              <button
-                onClick={handleSubmit}
+              <button disabled={sending || !comment.trim()} onClick={handleSubmit}
                 style={{ padding: "8px 20px", borderRadius: 8, background: "var(--primary)", color: "white", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
               >
-                送信する
+                {sending ? "送信中…" : "送信する"}
               </button>
             </div>
+            {error && <p style={{ color: "var(--danger)", fontSize: 12, margin: "10px 0 0" }}>{error}</p>}
           </div>
         </div>
       )}

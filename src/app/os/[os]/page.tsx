@@ -80,7 +80,7 @@ export default async function OSPage({ params }: Props) {
 
       {/* OS switcher */}
       <div style={{ display: "flex", gap: 8, marginBottom: 32 }}>
-        {(["windows11", "ios", "macos"] as const).map((o) => (
+        {(["windows11", "ios", "macos", "android"] as const).map((o) => (
           <Link
             key={o}
             href={`/os/${o}`}

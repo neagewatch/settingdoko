@@ -10,6 +10,7 @@ const EMPTY: Omit<Setting, "id" | "updated_at"> = {
   aliases: [], path: [], steps: [], related_slugs: [], keywords: [],
   description: "", screenshot_url: "",
   status: "published", published_at: null, verified_at: null, editor_note: "",
+  source_url: "",
 };
 
 function parseLines(text: string): string[] {
@@ -46,7 +47,7 @@ export function SettingEditorModal({
           related_slugs: setting.related_slugs, keywords: setting.keywords,
           description: setting.description, screenshot_url: setting.screenshot_url || "",
           status: setting.status || "published", published_at: setting.published_at || null,
-          verified_at: setting.verified_at || null, editor_note: setting.editor_note || "" }
+          verified_at: setting.verified_at || null, editor_note: setting.editor_note || "", source_url: setting.source_url || "" }
       : { ...EMPTY }
   );
   const [aliasText, setAliasText] = useState(toLines(setting?.aliases || []));
@@ -208,6 +209,10 @@ export function SettingEditorModal({
           <div style={{ gridColumn: "1/-1" }}>
             <label style={label}>編集メモ（公開ページには表示されません）</label>
             <textarea style={textarea} rows={2} value={form.editor_note || ""} onChange={(e) => setForm((f) => ({ ...f, editor_note: e.target.value }))} placeholder="確認したOSバージョン、更新理由、次回見直し内容など" />
+          </div>
+          <div style={{ gridColumn: "1/-1" }}>
+            <label style={label}>公式情報URL（任意）</label>
+            <input style={inp} type="url" value={form.source_url || ""} onChange={(e) => setForm((f) => ({ ...f, source_url: e.target.value }))} placeholder="https://support.microsoft.com/..." />
           </div>
           <div style={{ gridColumn: "1/-1" }}>
             <label style={label}>設定導線（1行1ステップ）*</label>

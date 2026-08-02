@@ -45,13 +45,14 @@ export default async function ComparePage({ params }: Props) {
         OS別の設定場所・手順を横並びで比較
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${settings.length}, 1fr)`, gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
         {settings.map((s) => (
           <div key={s.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
             {/* Header */}
             <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}>
               <OSBadge os={s.os} />
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{s.version}</div>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, margin: "10px 0 0" }}>{s.description}</p>
             </div>
             {/* Path */}
             <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>

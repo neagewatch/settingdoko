@@ -13,6 +13,7 @@ export interface ContentRequest {
   created_at: string;
 }
 export interface SettingRevision { id: string; setting_id: string; snapshot: Setting; created_at: string; }
+export interface ContentReport { id: string; setting_id: string; title: string; comment?: string | null; status: "new" | "reviewing" | "done"; created_at: string; }
 
 // supabaseがnullの場合はサンプルデータで動作
 const USE_SUPABASE = supabase !== null;
@@ -186,6 +187,12 @@ export async function getContentRequests(): Promise<ContentRequest[]> {
     .order("created_at", { ascending: false })
     .limit(100);
   return error ? [] : (data || []) as ContentRequest[];
+}
+
+export async function getContentReports(): Promise<ContentReport[]> {
+  if (!serverSupabase) return [];
+  const { data, error } = await serverSupabase.from("content_reports").select("id, setting_id, title, comment, status, created_at").order("created_at", { ascending: false }).limit(100);
+  return error ? [] : (data || []) as ContentReport[];
 }
 
 export async function getSettingRevisions(settingId: string): Promise<SettingRevision[]> {

@@ -3,18 +3,16 @@
 import { useEffect, useState, useCallback } from "react";
 import { getZeroHitSearches, getPopularSearches, getPopularSettings } from "@/lib/analytics";
 import { Setting, OS_LABELS, CATEGORIES } from "@/lib/types";
-import { ContentRequest } from "@/lib/data";
+import { ContentRequest, ContentReport } from "@/lib/data";
 import Link from "next/link";
 import { SettingEditorModal } from "./SettingEditor";
 
-interface Report { id: string; title: string; comment: string; timestamp: number; }
-
-export default function AdminClient({ settings: initialSettings, contentRequests }: { settings: Setting[]; contentRequests: ContentRequest[] }) {
+export default function AdminClient({ settings: initialSettings, contentRequests, contentReports }: { settings: Setting[]; contentRequests: ContentRequest[]; contentReports: ContentReport[] }) {
   const [settings, setSettings] = useState(initialSettings);
   const [zeroHits, setZeroHits] = useState<string[]>([]);
   const [popularSearches, setPopularSearches] = useState<{ query: string; count: number }[]>([]);
   const [popularSettings, setPopularSettings] = useState<{ slug: string; os: string; title: string; count: number }[]>([]);
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState(contentReports);
   const [mounted, setMounted] = useState(false);
   const [editTarget, setEditTarget] = useState<Setting | null | undefined>(undefined);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -40,9 +38,6 @@ export default function AdminClient({ settings: initialSettings, contentRequests
     setZeroHits(getZeroHitSearches(10));
     setPopularSearches(getPopularSearches(8));
     setPopularSettings(getPopularSettings(5));
-    try {
-      setReports(JSON.parse(localStorage.getItem("sdoko_reports") || "[]"));
-    } catch {}
   }, []);
 
   async function handleDelete(id: string, title: string) {
@@ -97,6 +92,12 @@ export default function AdminClient({ settings: initialSettings, contentRequests
     const response = await fetch("/api/admin/content-requests", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
     if (!response.ok) { alert("状態を更新できませんでした"); return; }
     setRequests((items) => items.map((item) => item.id === id ? { ...item, status } : item));
+  }
+
+  async function updateReportStatus(id: string, status: ContentReport["status"]) {
+    const response = await fetch("/api/admin/content-reports", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+    if (!response.ok) { alert("状態を更新できませんでした"); return; }
+    setReports((items) => items.map((item) => item.id === id ? { ...item, status } : item));
   }
 
   const filtered = settings.filter((s) =>
@@ -302,13 +303,14 @@ export default function AdminClient({ settings: initialSettings, contentRequests
             <p style={{ color: "var(--text-muted)", fontSize: 14 }}>報告はまだありません</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {reports.map((r, i) => (
-                <div key={i} style={{ padding: "14px 16px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+              {reports.map((r) => (
+                <div key={r.id} style={{ padding: "14px 16px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{r.title}</span>
                     <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: "auto" }}>
-                      {new Date(r.timestamp).toLocaleDateString("ja-JP")}
+                      {new Date(r.created_at).toLocaleDateString("ja-JP")}
                     </span>
+                    <select value={r.status} onChange={(event) => updateReportStatus(r.id, event.target.value as ContentReport["status"])} style={{ fontSize: 12, border: "1px solid var(--border)", borderRadius: 6, padding: "4px" }}><option value="new">未対応</option><option value="reviewing">確認中</option><option value="done">対応済み</option></select>
                   </div>
                   {r.comment && <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>{r.comment}</p>}
                 </div>

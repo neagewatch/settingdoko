@@ -10,6 +10,7 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'publ
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS editor_note TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS source_url TEXT;
 CREATE INDEX IF NOT EXISTS idx_settings_status ON settings(status);
 
 -- ユーザーの「この設定を探しています」リクエスト
@@ -28,6 +29,21 @@ DROP POLICY IF EXISTS "Authenticated users can read content requests" ON content
 CREATE POLICY "Anyone can submit content requests" ON content_requests FOR INSERT WITH CHECK (true);
 CREATE POLICY "Authenticated users can read content requests" ON content_requests FOR SELECT USING (auth.role() = 'authenticated');
 
+-- 記事の誤り・古さの報告（公開側から受け付け、管理画面で対応状態を管理）
+CREATE TABLE IF NOT EXISTS content_reports (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  setting_id UUID NOT NULL REFERENCES settings(id) ON DELETE CASCADE,
+  title TEXT NOT NULL, comment TEXT NOT NULL CHECK (char_length(comment) BETWEEN 1 AND 1000),
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','reviewing','done')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_content_reports_created_at ON content_reports(created_at DESC);
+ALTER TABLE content_reports ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can submit content reports" ON content_reports;
+DROP POLICY IF EXISTS "Authenticated users can manage content reports" ON content_reports;
+CREATE POLICY "Anyone can submit content reports" ON content_reports FOR INSERT WITH CHECK (true);
+CREATE POLICY "Authenticated users can manage content reports" ON content_reports FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
 -- 記事履歴。管理画面の保存処理をサービスロール経由へ移行する際に利用します。
 CREATE TABLE IF NOT EXISTS setting_revisions (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -42,4 +58,4 @@ DROP POLICY IF EXISTS "Authenticated users can manage revisions" ON setting_revi
 CREATE POLICY "Authenticated users can manage revisions" ON setting_revisions FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 
 -- 実行後の確認
-SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('settings','content_requests','setting_revisions');
+SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('settings','content_requests','content_reports','setting_revisions');

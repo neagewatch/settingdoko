@@ -208,9 +208,11 @@ async function renderDetail(
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <HelpfulButton settingId={setting.id} />
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              最終更新: {new Date(setting.updated_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>最終更新: {new Date(setting.updated_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}</span>
+              {setting.verified_at && <span style={{ fontSize: 12, color: "#15803D" }}>✓ {new Date(setting.verified_at).toLocaleDateString("ja-JP")}に確認</span>}
+              {setting.source_url && <a href={setting.source_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--primary)", textDecoration: "none" }}>公式情報 ↗</a>}
+            </div>
             <ReportButton settingId={setting.id} title={setting.title} />
           </div>
         </div>
