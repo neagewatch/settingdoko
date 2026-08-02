@@ -1,7 +1,17 @@
 import { supabase } from "./supabase";
+import { serverSupabase } from "./server-supabase";
 import { Setting, OSType, SettingStep } from "./types";
 import { allSampleSettings } from "./sample-data-export";
 import { searchSettings } from "./search";
+
+export interface ContentRequest {
+  id: string;
+  query: string;
+  os?: string | null;
+  note?: string | null;
+  status: "new" | "reviewing" | "done";
+  created_at: string;
+}
 
 // supabaseがnullの場合はサンプルデータで動作
 const USE_SUPABASE = supabase !== null;
@@ -153,4 +163,14 @@ export async function getSettingById(id: string): Promise<Setting | null> {
   const { data, error } = await supabase!.from("settings").select("*").eq("id", id).single();
   if (error) return null;
   return normalizeSetting(data);
+}
+
+export async function getContentRequests(): Promise<ContentRequest[]> {
+  if (!serverSupabase) return [];
+  const { data, error } = await serverSupabase
+    .from("content_requests")
+    .select("id, query, os, note, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  return error ? [] : (data || []) as ContentRequest[];
 }

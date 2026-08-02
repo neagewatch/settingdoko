@@ -5,6 +5,7 @@ import SettingCard from "@/components/SettingCard";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { searchSettings } from "@/lib/search";
+import ContentRequestForm from "@/components/ContentRequestForm";
 
 type Props = { searchParams: Promise<{ q?: string; os?: string; diff?: string }> };
 
@@ -78,6 +79,8 @@ export default async function SearchPage({ searchParams }: Props) {
                 「{q}」は見つかりませんでした
               </p>
               <p style={{ fontSize: 14, marginBottom: 28 }}>別のキーワードで検索するか、OS一覧から探してみてください</p>
+
+              <ContentRequestForm query={q} os={os} />
 
               {suggestions.length > 0 && (
                 <div style={{ marginBottom: 32 }}>

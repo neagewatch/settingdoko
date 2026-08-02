@@ -81,7 +81,8 @@ git push -u origin main
    |------|-------|
    | `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxxxxxxxx.supabase.co` |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` |
-   | `NEXT_PUBLIC_BASE_URL` | `https://settingdoko.vercel.app` (後で確定URLに変更) |
+| `NEXT_PUBLIC_BASE_URL` | `https://settingdoko.vercel.app` (後で確定URLに変更) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Settings → API の service_role key（サーバー専用・絶対に公開しない） |
 
 5. 「Deploy」をクリック → 1〜2分待つ
 6. デプロイ完了 → URLが発行される
