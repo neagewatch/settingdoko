@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getStepImage, getStepText, Setting, SettingStep, OS_LABELS, CATEGORIES } from "@/lib/types";
+import { SettingRevision } from "@/lib/data";
 
 const EMPTY: Omit<Setting, "id" | "updated_at"> = {
   title: "", slug: "", os: "windows11", version: "23H2", category: "system",
@@ -56,6 +57,19 @@ export function SettingEditorModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState<"cover" | number | null>(null);
+  const [revisions, setRevisions] = useState<SettingRevision[]>([]);
+
+  useEffect(() => {
+    if (!setting?.id) return;
+    fetch(`/api/admin/revisions/${setting.id}`).then((response) => response.ok ? response.json() : []).then(setRevisions).catch(() => {});
+  }, [setting?.id]);
+
+  async function restoreRevision(revisionId: string) {
+    if (!setting || !confirm("この時点の内容へ復元します。現在の内容も履歴として保存されます。続けますか？")) return;
+    const response = await fetch(`/api/admin/revisions/${setting.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revisionId }) });
+    if (!response.ok) { setError("履歴を復元できませんでした"); return; }
+    onSaved(); onClose();
+  }
 
   const inp = {
     width: "100%", padding: "9px 12px", borderRadius: 8,
@@ -272,6 +286,15 @@ export function SettingEditorModal({
             </div>
           </div>
         </div>
+
+        {!isNew && revisions.length > 0 && (
+          <div style={{ marginTop: 8, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <h3 style={{ fontSize: 14, margin: "0 0 8px" }}>編集履歴</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {revisions.slice(0, 5).map((revision) => <div key={revision.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-secondary)" }}><span>{new Date(revision.created_at).toLocaleString("ja-JP")}</span><span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{revision.snapshot.title}</span><button type="button" onClick={() => restoreRevision(revision.id)} style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--surface)", padding: "4px 8px", cursor: "pointer", fontSize: 12 }}>復元</button></div>)}
+            </div>
+          </div>
+        )}
 
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>⚠ {error}</p>}
 

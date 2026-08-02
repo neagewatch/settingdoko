@@ -24,6 +24,7 @@ export default function AdminClient({ settings: initialSettings, contentRequests
   const [activeTab, setActiveTab] = useState<"data" | "analytics" | "ai" | "reports" | "requests">("data");
   const [importingWindows, setImportingWindows] = useState(false);
   const [importingAdditional, setImportingAdditional] = useState(false);
+  const [requests, setRequests] = useState(contentRequests);
 
   // AI Assist
   const [aiTitle, setAiTitle] = useState("");
@@ -92,6 +93,12 @@ export default function AdminClient({ settings: initialSettings, contentRequests
     finally { setImportingAdditional(false); }
   }
 
+  async function updateRequestStatus(id: string, status: ContentRequest["status"]) {
+    const response = await fetch("/api/admin/content-requests", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+    if (!response.ok) { alert("状態を更新できませんでした"); return; }
+    setRequests((items) => items.map((item) => item.id === id ? { ...item, status } : item));
+  }
+
   const filtered = settings.filter((s) =>
     (!filterOS || s.os === filterOS) &&
     (!filterCat || s.category === filterCat) &&
@@ -114,7 +121,7 @@ export default function AdminClient({ settings: initialSettings, contentRequests
         <button style={tabBtn("analytics")} onClick={() => setActiveTab("analytics")}>📊 アナリティクス</button>
         <button style={tabBtn("ai")} onClick={() => setActiveTab("ai")}>🤖 AI補助</button>
         <button style={tabBtn("reports")} onClick={() => setActiveTab("reports")}>🚩 報告 {reports.length > 0 && `(${reports.length})`}</button>
-        <button style={tabBtn("requests")} onClick={() => setActiveTab("requests")}>💡 追加リクエスト {contentRequests.length > 0 && `(${contentRequests.length})`}</button>
+        <button style={tabBtn("requests")} onClick={() => setActiveTab("requests")}>💡 追加リクエスト {requests.length > 0 && `(${requests.length})`}</button>
       </div>
 
       {/* ===== DATA TAB ===== */}
@@ -315,11 +322,11 @@ export default function AdminClient({ settings: initialSettings, contentRequests
         <div style={card}>
           <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 8px" }}>💡 ユーザーが探している設定</h3>
           <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 16px" }}>ゼロヒット時に送られた内容です。記事作成の優先順位に使えます。</p>
-          {contentRequests.length === 0 ? <p style={{ color: "var(--text-muted)", fontSize: 14 }}>リクエストはまだありません</p> : (
+          {requests.length === 0 ? <p style={{ color: "var(--text-muted)", fontSize: 14 }}>リクエストはまだありません</p> : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {contentRequests.map((item) => (
+              {requests.map((item) => (
                 <div key={item.id} style={{ padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}><strong style={{ fontSize: 14 }}>{item.query}</strong><span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 12 }}>{new Date(item.created_at).toLocaleDateString("ja-JP")}</span></div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}><strong style={{ fontSize: 14 }}>{item.query}</strong><select value={item.status} onChange={(event) => updateRequestStatus(item.id, event.target.value as ContentRequest["status"])} style={{ marginLeft: "auto", fontSize: 12, border: "1px solid var(--border)", borderRadius: 6, padding: "4px" }}><option value="new">未対応</option><option value="reviewing">確認中</option><option value="done">対応済み</option></select><span style={{ color: "var(--text-muted)", fontSize: 12 }}>{new Date(item.created_at).toLocaleDateString("ja-JP")}</span></div>
                   {item.note && <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>{item.note}</p>}
                 </div>
               ))}
