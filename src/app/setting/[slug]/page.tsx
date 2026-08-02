@@ -1,7 +1,7 @@
 export const revalidate = 60;
 
 import { getSettingBySlugAndOS, getSettingsBySlug, getRelatedSettings, getSettingsByOS } from "@/lib/data";
-import { OSType, OS_LABELS, CATEGORIES, DIFFICULTY_LABELS, DIFFICULTY_COLORS, getStepText } from "@/lib/types";
+import { OSType, OS_LABELS, CATEGORIES, DIFFICULTY_LABELS, DIFFICULTY_COLORS, getStepImage, getStepText } from "@/lib/types";
 import PathTrail from "@/components/PathTrail";
 import OSTabs from "@/components/OSTabs";
 import OSBadge from "@/components/OSBadge";
@@ -40,6 +40,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
       images: [{ url: ogImageUrl, width: 1200, height: 630, alt: setting.title }],
     },
     twitter: { card: "summary_large_image", title: `${setting.title} | 設定どこ？`, description: setting.description, images: [ogImageUrl] },
+    alternates: { canonical: `/setting/${setting.slug}?os=${setting.os}` },
   };
 }
 
@@ -64,7 +65,6 @@ async function renderDetail(
   slug: string,
   availableOS: string[]
 ) {
-  const related = await getRelatedSettings(setting.related_slugs, setting.id);
   const progressKey = `${setting.slug}-${setting.os}`;
 
   // 前/次ナビ用：同OSのカテゴリ内設定を取得
@@ -73,10 +73,18 @@ async function renderDetail(
   const currentIdx = catSettings.findIndex((s) => s.slug === setting.slug);
   const prevSetting = currentIdx > 0 ? catSettings[currentIdx - 1] : null;
   const nextSetting = currentIdx < catSettings.length - 1 ? catSettings[currentIdx + 1] : null;
+  const explicitlyRelated = await getRelatedSettings(setting.related_slugs, setting.id);
+  const related = explicitlyRelated.length > 0
+    ? explicitlyRelated
+    : catSettings.filter((item) => item.id !== setting.id).slice(0, 4);
+  const stepImages = setting.steps
+    .map(getStepImage)
+    .flatMap(({ image_url }) => image_url ? [image_url] : []);
 
   const jsonLd = {
     "@context": "https://schema.org", "@type": "HowTo",
-    name: setting.title, description: setting.description,
+    name: setting.title, description: setting.description, dateModified: setting.updated_at,
+    ...(stepImages.length > 0 ? { image: stepImages } : setting.screenshot_url ? { image: [setting.screenshot_url] } : {}),
     step: setting.steps.map((step, i) => ({ "@type": "HowToStep", position: i + 1, text: getStepText(step) })),
   };
   const breadcrumbLd = {

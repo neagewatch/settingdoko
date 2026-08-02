@@ -17,6 +17,13 @@ const STATIC_POPULAR = [
   { label: "DNS変更", q: "DNS" },
 ];
 
+const PURPOSE_SEARCHES = [
+  { label: "通知を消したい", q: "通知を消したい" },
+  { label: "画面を暗くしたい", q: "画面を暗くしたい" },
+  { label: "Wi-Fiが切れる", q: "Wi-Fiが切れる" },
+  { label: "通信量を節約したい", q: "通信量を節約したい" },
+];
+
 const FEATURES = [
   { id: "new-pc-setup", emoji: "💻", title: "新PC初期設定" },
   { id: "iphone-switch", emoji: "📱", title: "iPhone乗り換え" },
@@ -52,6 +59,15 @@ export default async function Home() {
       {/* Search */}
       <div style={{ maxWidth: 640, margin: "0 auto 28px" }}>
         <SearchBox large />
+      </div>
+
+      <div style={{ maxWidth: 640, margin: "0 auto 32px" }}>
+        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 8px" }}>目的から探す</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+          {PURPOSE_SEARCHES.map((item) => (
+            <Link key={item.q} href={`/search?q=${encodeURIComponent(item.q)}`} className="filter-chip">{item.label}</Link>
+          ))}
+        </div>
       </div>
 
       {/* Popular searches */}

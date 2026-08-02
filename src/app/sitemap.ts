@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
 import { getAllSettings } from "@/lib/data";
+import { OS_LABELS } from "@/lib/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
 
@@ -30,8 +31,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }));
 
   // OS一覧ページ
-  const osUrls = ["windows11", "ios", "macos"].map((os) => ({
+  const osUrls = Object.keys(OS_LABELS).map((os) => ({
     url: `${BASE_URL}/os/${os}`,
+    lastModified: new Date(),
+    changeFrequency: "weekly" as const,
+    priority: 0.7,
+  }));
+
+  const categoryUrls = [...new Set(settings.map((setting) => setting.category))].map((category) => ({
+    url: `${BASE_URL}/category/${category}`,
     lastModified: new Date(),
     changeFrequency: "weekly" as const,
     priority: 0.7,
@@ -51,6 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: BASE_URL, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
     ...osUrls,
+    ...categoryUrls,
     ...featureUrls,
     ...settingUrls,
     ...compareUrls,

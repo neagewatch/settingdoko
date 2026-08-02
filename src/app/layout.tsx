@@ -4,7 +4,10 @@ import Link from "next/link";
 import { DarkModeScript } from "@/components/DarkMode";
 import SiteHeader from "@/components/SiteHeader";
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(BASE_URL),
   title: { default: "設定どこ？ - PC・スマホの設定ナビ", template: "%s | 設定どこ？" },
   description: "「設定の場所がわからない」を最速で解決。Windows・iPhone・Macの設定場所を検索して最短導線で設定にたどりつけます。",
   openGraph: {
@@ -12,6 +15,7 @@ export const metadata: Metadata = {
     description: "「設定の場所がわからない」を最速で解決。設定場所を検索できます。",
     type: "website", locale: "ja_JP",
   },
+  alternates: { canonical: "/" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
