@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { getProgress, toggleStep, clearProgress } from "@/lib/analytics";
+import { getStepImage, getStepText, SettingStep } from "@/lib/types";
 
 export default function StepChecklist({
   steps,
   progressKey,
 }: {
-  steps: string[];
+  steps: SettingStep[];
   progressKey: string;
 }) {
   const [completed, setCompleted] = useState<number[]>([]);
@@ -37,7 +38,7 @@ export default function StepChecklist({
         {steps.map((step, i) => (
           <li key={i} className="step-item">
             <span className="step-number">{i + 1}</span>
-            <span className="step-text">{step}</span>
+            <StepContent step={step} />
           </li>
         ))}
       </ol>
@@ -80,7 +81,7 @@ export default function StepChecklist({
               <span className="step-number">
                 {done ? "✓" : i + 1}
               </span>
-              <span className="step-text">{step}</span>
+              <StepContent step={step} />
             </li>
           );
         })}
@@ -96,5 +97,23 @@ export default function StepChecklist({
         </div>
       )}
     </div>
+  );
+}
+
+function StepContent({ step }: { step: SettingStep }) {
+  const { image_url, image_alt } = getStepImage(step);
+  return (
+    <span style={{ minWidth: 0, flex: 1 }}>
+      <span className="step-text">{getStepText(step)}</span>
+      {image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={image_url}
+          alt={image_alt || getStepText(step)}
+          loading="lazy"
+          style={{ display: "block", width: "100%", maxWidth: 640, height: "auto", marginTop: 12, borderRadius: 8, border: "1px solid var(--border)" }}
+        />
+      )}
+    </span>
   );
 }

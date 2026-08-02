@@ -1,6 +1,24 @@
 export type OSType = "windows11" | "ios" | "macos" | "android" | "windows10";
 export type Difficulty = "beginner" | "intermediate" | "advanced";
 
+/**
+ * 旧データとの互換性のため文字列も受け付ける。
+ * 画像を添付した手順だけオブジェクト形式で保存する。
+ */
+export type SettingStep = string | {
+  text: string;
+  image_url?: string;
+  image_alt?: string;
+};
+
+export function getStepText(step: SettingStep): string {
+  return typeof step === "string" ? step : step.text;
+}
+
+export function getStepImage(step: SettingStep): { image_url?: string; image_alt?: string } {
+  return typeof step === "string" ? {} : { image_url: step.image_url, image_alt: step.image_alt };
+}
+
 export interface Setting {
   id: string;
   title: string;
@@ -10,7 +28,7 @@ export interface Setting {
   category: string;
   aliases: string[];
   path: string[];
-  steps: string[];
+  steps: SettingStep[];
   related_slugs: string[];
   keywords: string[];
   description: string;

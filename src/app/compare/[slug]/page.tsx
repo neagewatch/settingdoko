@@ -1,7 +1,7 @@
 import { getSettingsBySlug } from "@/lib/data";
 
 export const revalidate = 60;
-import { OS_LABELS, CATEGORIES } from "@/lib/types";
+import { OS_LABELS, CATEGORIES, getStepText } from "@/lib/types";
 import PathTrail from "@/components/PathTrail";
 import OSBadge from "@/components/OSBadge";
 import { notFound } from "next/navigation";
@@ -65,7 +65,7 @@ export default async function ComparePage({ params }: Props) {
                 {s.steps.map((step, i) => (
                   <li key={i} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
                     <span style={{ background: "var(--primary)", color: "white", width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
-                    <span style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text)" }}>{step}</span>
+                    <span style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text)" }}>{getStepText(step)}</span>
                   </li>
                 ))}
               </ol>

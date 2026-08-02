@@ -1,7 +1,7 @@
 export const revalidate = 60;
 
 import { getSettingBySlugAndOS, getSettingsBySlug, getRelatedSettings, getSettingsByOS } from "@/lib/data";
-import { OSType, OS_LABELS, CATEGORIES, DIFFICULTY_LABELS, DIFFICULTY_COLORS } from "@/lib/types";
+import { OSType, OS_LABELS, CATEGORIES, DIFFICULTY_LABELS, DIFFICULTY_COLORS, getStepText } from "@/lib/types";
 import PathTrail from "@/components/PathTrail";
 import OSTabs from "@/components/OSTabs";
 import OSBadge from "@/components/OSBadge";
@@ -77,7 +77,7 @@ async function renderDetail(
   const jsonLd = {
     "@context": "https://schema.org", "@type": "HowTo",
     name: setting.title, description: setting.description,
-    step: setting.steps.map((step, i) => ({ "@type": "HowToStep", position: i + 1, text: step })),
+    step: setting.steps.map((step, i) => ({ "@type": "HowToStep", position: i + 1, text: getStepText(step) })),
   };
   const breadcrumbLd = {
     "@context": "https://schema.org", "@type": "BreadcrumbList",
@@ -95,7 +95,7 @@ async function renderDetail(
       name: `${OS_LABELS[setting.os]}で${setting.title}方法は？`,
       acceptedAnswer: {
         "@type": "Answer",
-        text: `${setting.description} 設定場所：${setting.path.join(" > ")}。手順：${setting.steps.join("→")}`,
+        text: `${setting.description} 設定場所：${setting.path.join(" > ")}。手順：${setting.steps.map(getStepText).join("→")}`,
       },
     }],
   };

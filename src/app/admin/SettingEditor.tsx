@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Setting, OS_LABELS, CATEGORIES } from "@/lib/types";
+import { getStepImage, getStepText, Setting, SettingStep, OS_LABELS, CATEGORIES } from "@/lib/types";
 
 const EMPTY: Omit<Setting, "id" | "updated_at"> = {
   title: "", slug: "", os: "windows11", version: "23H2", category: "system",
@@ -15,6 +15,15 @@ function parseLines(text: string): string[] {
 }
 function toLines(arr: string[]): string {
   return arr.join("\n");
+}
+
+type StepMedia = { image_url: string; image_alt: string };
+
+function stepMediaByIndex(steps: SettingStep[]): Record<number, StepMedia> {
+  return Object.fromEntries(steps.map((step, index) => {
+    const { image_url, image_alt } = getStepImage(step);
+    return [index, { image_url: image_url || "", image_alt: image_alt || "" }];
+  }));
 }
 
 export function SettingEditorModal({
@@ -38,11 +47,12 @@ export function SettingEditorModal({
   );
   const [aliasText, setAliasText] = useState(toLines(setting?.aliases || []));
   const [pathText, setPathText] = useState(toLines(setting?.path || []));
-  const [stepsText, setStepsText] = useState(toLines(setting?.steps || []));
+  const [stepsText, setStepsText] = useState((setting?.steps || []).map(getStepText).join("\n"));
+  const [stepMedia, setStepMedia] = useState<Record<number, StepMedia>>(stepMediaByIndex(setting?.steps || []));
   const [keywordsText, setKeywordsText] = useState(toLines(setting?.keywords || []));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState<"cover" | number | null>(null);
 
   const inp = {
     width: "100%", padding: "9px 12px", borderRadius: 8,
@@ -52,21 +62,28 @@ export function SettingEditorModal({
   const textarea = { ...inp, resize: "vertical" as const, fontFamily: "inherit" };
   const label = { fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block" as const, marginBottom: 4 };
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>, target: "cover" | number) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploading(true);
+    setUploading(target);
     const fd = new FormData();
     fd.append("file", file);
     try {
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const { url, error } = await res.json();
       if (error) throw new Error(error);
-      setForm((f) => ({ ...f, screenshot_url: url }));
+      if (target === "cover") {
+        setForm((f) => ({ ...f, screenshot_url: url }));
+      } else {
+        setStepMedia((current) => ({
+          ...current,
+          [target]: { image_url: url, image_alt: current[target]?.image_alt || "" },
+        }));
+      }
     } catch (e) {
       alert("アップロード失敗: " + String(e));
     } finally {
-      setUploading(false);
+      setUploading(null);
     }
   }
 
@@ -77,7 +94,12 @@ export function SettingEditorModal({
       ...form,
       aliases: parseLines(aliasText),
       path: parseLines(pathText),
-      steps: parseLines(stepsText),
+      steps: parseLines(stepsText).map((text, index) => {
+        const media = stepMedia[index];
+        return media?.image_url || media?.image_alt
+          ? { text, ...(media.image_url ? { image_url: media.image_url } : {}), ...(media.image_alt ? { image_alt: media.image_alt } : {}) }
+          : text;
+      }),
       keywords: parseLines(keywordsText),
       related_slugs: parseLines(form.related_slugs?.join("\n") || ""),
     };
@@ -164,6 +186,41 @@ export function SettingEditorModal({
             <label style={label}>手順（1行1ステップ）*</label>
             <textarea style={textarea} rows={5} value={stepsText} onChange={(e) => setStepsText(e.target.value)} placeholder={"設定を開く（Win + I）\n「システム」をクリック\n..."} />
           </div>
+          {parseLines(stepsText).length > 0 && (
+            <div style={{ gridColumn: "1/-1", padding: 16, border: "1px solid var(--border)", borderRadius: 10, background: "var(--surface-2)" }}>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ ...label, marginBottom: 2 }}>手順ごとの画像（任意）</label>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>画像を付けたい手順だけ選択してください。画像の代替テキストはアクセシビリティとSEOに使われます。</p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {parseLines(stepsText).map((step, index) => {
+                  const media = stepMedia[index] || { image_url: "", image_alt: "" };
+                  return (
+                    <div key={`${index}-${step}`} style={{ padding: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)" }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 10px" }}>{index + 1}. {step}</p>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8 }}>
+                        <input style={{ ...inp, fontSize: 13 }} value={media.image_url} placeholder="画像URL または下からアップロード" onChange={(e) => setStepMedia((current) => ({ ...current, [index]: { ...media, image_url: e.target.value } }))} />
+                        <input style={{ ...inp, fontSize: 13 }} value={media.image_alt} placeholder="画像の説明（例：表示メニュー）" onChange={(e) => setStepMedia((current) => ({ ...current, [index]: { ...media, image_alt: e.target.value } }))} />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
+                          <span style={{ padding: "6px 12px", borderRadius: 7, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12, fontWeight: 500 }}>
+                            {uploading === index ? "アップロード中..." : "📁 この手順に画像を選択"}
+                          </span>
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleUpload(e, index)} disabled={uploading !== null} />
+                        </label>
+                        {media.image_url && <button type="button" onClick={() => setStepMedia((current) => ({ ...current, [index]: { image_url: "", image_alt: media.image_alt } }))} style={{ padding: "6px 10px", border: "none", background: "none", color: "var(--danger)", cursor: "pointer", fontSize: 12 }}>画像を外す</button>}
+                      </div>
+                      {media.image_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={media.image_url} alt={media.image_alt || `手順${index + 1}のプレビュー`} style={{ display: "block", maxWidth: "100%", maxHeight: 180, marginTop: 10, borderRadius: 6, border: "1px solid var(--border)", objectFit: "contain" }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div>
             <label style={label}>aliases（1行1件）</label>
             <textarea style={textarea} rows={4} value={aliasText} onChange={(e) => setAliasText(e.target.value)} placeholder={"拡張子表示\n拡張子を見たい\nファイルの種類"} />
@@ -187,9 +244,9 @@ export function SettingEditorModal({
               />
               <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                 <span style={{ padding: "7px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 13, fontWeight: 500 }}>
-                  {uploading ? "アップロード中..." : "📁 画像を選択"}
+                  {uploading === "cover" ? "アップロード中..." : "📁 画像を選択"}
                 </span>
-                <input type="file" accept="image/*" style={{ display: "none" }} onChange={handleUpload} disabled={uploading} />
+                <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleUpload(e, "cover")} disabled={uploading !== null} />
               </label>
               {form.screenshot_url && (
                 // eslint-disable-next-line @next/next/no-img-element

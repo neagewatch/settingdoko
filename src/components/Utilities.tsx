@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { getStepText, SettingStep } from "@/lib/types";
 
-export function CopyStepsButton({ steps, path }: { steps: string[]; path: string[] }) {
+export function CopyStepsButton({ steps, path }: { steps: SettingStep[]; path: string[] }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -10,7 +11,7 @@ export function CopyStepsButton({ steps, path }: { steps: string[]; path: string
       `設定場所: ${path.join(" > ")}`,
       "",
       "手順:",
-      ...steps.map((s, i) => `${i + 1}. ${s}`),
+      ...steps.map((s, i) => `${i + 1}. ${getStepText(s)}`),
     ].join("\n");
     try {
       await navigator.clipboard.writeText(text);

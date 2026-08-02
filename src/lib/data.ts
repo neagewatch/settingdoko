@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { Setting, OSType } from "./types";
+import { Setting, OSType, SettingStep } from "./types";
 import { allSampleSettings } from "./sample-data-export";
 import { searchSettings } from "./search";
 
@@ -24,12 +24,31 @@ function normalizeTextList(value: unknown): string[] {
   });
 }
 
+function normalizeSteps(value: unknown): SettingStep[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item): SettingStep[] => {
+    if (typeof item === "string") return item.trim() ? [item] : [];
+    if (!item || typeof item !== "object" || !("text" in item)) return [];
+
+    const { text, image_url, image_alt } = item as {
+      text?: unknown; image_url?: unknown; image_alt?: unknown;
+    };
+    if (typeof text !== "string" || !text.trim()) return [];
+    return [{
+      text,
+      ...(typeof image_url === "string" && image_url ? { image_url } : {}),
+      ...(typeof image_alt === "string" && image_alt ? { image_alt } : {}),
+    }];
+  });
+}
+
 function normalizeSetting(setting: Setting): Setting {
   return {
     ...setting,
     aliases: normalizeTextList(setting.aliases),
     path: normalizeTextList(setting.path),
-    steps: normalizeTextList(setting.steps),
+    steps: normalizeSteps(setting.steps),
     related_slugs: normalizeTextList(setting.related_slugs),
     keywords: normalizeTextList(setting.keywords),
   };
