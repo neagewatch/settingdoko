@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createSetting, updateSetting, deleteSetting } from "@/lib/data";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "settingdoko2024";
-
-async function checkAuth() {
-  const cookieStore = await cookies();
-  return cookieStore.get("admin_auth")?.value === ADMIN_PASSWORD;
-}
+import { isAdminAuthenticated as checkAuth } from "@/lib/admin-auth";
 
 // 新規作成
 export async function POST(request: NextRequest) {

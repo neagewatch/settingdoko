@@ -3,26 +3,22 @@ import { OS_LABELS, CATEGORIES } from "@/lib/types";
 import Link from "next/link";
 import AdminClient from "./AdminClient";
 import AdminAuth from "./AdminAuth";
-import { cookies } from "next/headers";
+import { isAdminAuthenticated, isMfaLoginAvailable, passwordLoginEnabled } from "@/lib/admin-auth";
 import type { Metadata } from "next";
 
 export const revalidate = 0; // 常に最新を取得
 export const metadata: Metadata = { title: "管理画面", robots: "noindex" };
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "settingdoko2024";
 
 export default async function AdminPage({
   searchParams,
 }: {
   searchParams: Promise<{ auth?: string }>;
 }) {
-  const params = await searchParams;
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get("admin_auth");
-  const isAuthed = authCookie?.value === ADMIN_PASSWORD || params.auth === ADMIN_PASSWORD;
+  await searchParams;
+  const isAuthed = await isAdminAuthenticated();
 
   if (!isAuthed) {
-    return <AdminAuth />;
+    return <AdminAuth mfaAvailable={isMfaLoginAvailable()} passwordEnabled={passwordLoginEnabled()} />;
   }
 
   const [settings, contentRequests] = await Promise.all([getAllSettings(), getContentRequests()]);
