@@ -23,6 +23,7 @@ export default function AdminClient({ settings: initialSettings, contentRequests
   const [filterQ, setFilterQ] = useState("");
   const [activeTab, setActiveTab] = useState<"data" | "analytics" | "ai" | "reports" | "requests">("data");
   const [importingWindows, setImportingWindows] = useState(false);
+  const [importingAdditional, setImportingAdditional] = useState(false);
 
   // AI Assist
   const [aiTitle, setAiTitle] = useState("");
@@ -78,6 +79,19 @@ export default function AdminClient({ settings: initialSettings, contentRequests
     finally { setImportingWindows(false); }
   }
 
+  async function importAdditionalPack() {
+    if (!confirm("追加コンテンツパックを投入・更新します。既存記事は削除されません。続けますか？")) return;
+    setImportingAdditional(true);
+    try {
+      const response = await fetch("/api/admin/import-additional", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "投入に失敗しました");
+      alert(`追加記事 ${data.count}件を投入しました`);
+      window.location.reload();
+    } catch (error) { alert(error instanceof Error ? error.message : "投入に失敗しました"); }
+    finally { setImportingAdditional(false); }
+  }
+
   const filtered = settings.filter((s) =>
     (!filterOS || s.os === filterOS) &&
     (!filterCat || s.category === filterCat) &&
@@ -126,6 +140,9 @@ export default function AdminClient({ settings: initialSettings, contentRequests
             </button>
             <button onClick={importWindowsPack} disabled={importingWindows} style={{ padding: "8px 14px", borderRadius: 8, background: "var(--surface-2)", color: "var(--text)", border: "1px solid var(--border)", cursor: importingWindows ? "wait" : "pointer", fontSize: 13, fontWeight: 600 }}>
               {importingWindows ? "投入中…" : "Windows記事53件を投入"}
+            </button>
+            <button onClick={importAdditionalPack} disabled={importingAdditional} style={{ padding: "8px 14px", borderRadius: 8, background: "var(--surface-2)", color: "var(--text)", border: "1px solid var(--border)", cursor: importingAdditional ? "wait" : "pointer", fontSize: 13, fontWeight: 600 }}>
+              {importingAdditional ? "投入中…" : "追加コンテンツを一括投入"}
             </button>
           </div>
 

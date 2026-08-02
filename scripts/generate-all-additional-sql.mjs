@@ -399,6 +399,8 @@ const allAdditional = [
     description:"Androidでスクリーンショットを撮る方法です。" },
 ];
 
+export { allAdditional };
+
 function pgArr(arr) {
   if (!arr || arr.length === 0) return "ARRAY[]::text[]";
   return "ARRAY[" + arr.map(s => `'${s.replace(/'/g,"''")}'`).join(",") + "]";
@@ -410,6 +412,7 @@ const ios = allAdditional.filter(s => s.os === "ios");
 const macos = allAdditional.filter(s => s.os === "macos");
 const android = allAdditional.filter(s => s.os === "android");
 
+function printSql() {
 console.log("-- =============================================");
 console.log("-- 設定どこ？ - 全追加データ");
 console.log(`-- 合計${allAdditional.length}件`);
@@ -431,3 +434,6 @@ console.log("  aliases=EXCLUDED.aliases,path=EXCLUDED.path,steps=EXCLUDED.steps,
 console.log("  related_slugs=EXCLUDED.related_slugs,keywords=EXCLUDED.keywords,");
 console.log("  description=EXCLUDED.description,updated_at=NOW();");
 console.log("\nSELECT os, count(*) FROM settings GROUP BY os ORDER BY os;");
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) printSql();
