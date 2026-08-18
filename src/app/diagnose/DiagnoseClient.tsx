@@ -14,8 +14,8 @@ export default function DiagnoseClient({ options }: { options: DiagnoseOption[] 
   const [choice, setChoice] = useState<string | null>(null);
   const selected = options.find((item) => item.query === choice);
   return <div className="utility-page diagnose-page" style={{ maxWidth: 680, margin: "0 auto", padding: "34px 0 64px" }}>
-    <p className="section-index">DIAGNOSE / 症状から探す</p>
-    <h1 className="page-title" style={{ fontSize: 28, margin: "0 0 10px" }}>症状から設定を探す</h1>
+    <p className="section-index">DIAGNOSE / トラブルから探す</p>
+    <h1 className="page-title" style={{ fontSize: 28, margin: "0 0 10px" }}>症状からトラブル解決方法を探す</h1>
     <p className="page-subtitle" style={{ margin: "0 0 24px" }}>設定名が分からなくても大丈夫です。困っていることを選ぶと、対応するトラブル解決ガイドへ案内します。</p>
     <div className="diagnose-options" style={{ display: "grid", gap: 10 }}>
       {options.map((item) => <button className={`diagnose-option ${choice === item.query ? "selected" : ""}`} type="button" key={item.query} aria-pressed={choice === item.query} onClick={() => setChoice(item.query)} style={{ textAlign: "left", padding: "16px 18px", cursor: "pointer", borderRadius: 10, border: choice === item.query ? "2px solid var(--primary)" : "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontSize: 15, fontWeight: 600 }}>{item.label}<span aria-hidden="true" style={{ float: "right", color: "var(--text-muted)" }}>→</span></button>)}

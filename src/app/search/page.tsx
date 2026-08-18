@@ -15,7 +15,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const displayQuery = q?.slice(0, 80);
   return {
     title: displayQuery ? `「${displayQuery}」の検索結果` : "検索",
-    description: displayQuery ? `「${displayQuery}」に関する設定場所・手順の検索結果です。` : "PC・スマホの設定を検索",
+    description: displayQuery ? `「${displayQuery}」に関する設定方法・トラブル解決の検索結果です。` : "PC・スマホの設定方法とトラブル解決を検索",
     robots: "noindex",
   };
 }
@@ -37,8 +37,8 @@ export default async function SearchPage({ searchParams }: Props) {
     <div className="listing-page search-page" style={{ padding: "32px 0 60px" }}>
       {q && <SearchTelemetry query={q} resultCount={results.length} os={osType} />}
       <div className="listing-heading">
-        <p className="section-index">SEARCH / 設定を探す</p>
-        <h1>{q ? `「${q}」の検索結果` : "設定を検索"}</h1>
+        <p className="section-index">SEARCH / 設定・トラブルを探す</p>
+        <h1>{q ? `「${q}」の検索結果` : "設定・トラブルを検索"}</h1>
         <p>正式な設定名が分からなくても、困っていることをそのまま入力できます。</p>
       </div>
       <div className="listing-search-box" style={{ marginBottom: 24 }}>

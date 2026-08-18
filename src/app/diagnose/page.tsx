@@ -4,7 +4,7 @@ import { getAllSettings } from "@/lib/data";
 import type { OSType } from "@/lib/types";
 
 export const revalidate = 60;
-export const metadata: Metadata = { title: "症状から設定を探す", description: "Wi-Fi、通知、バッテリー、画面などの困りごとから設定を探せます。", alternates: { canonical: "/diagnose" } };
+export const metadata: Metadata = { title: "症状からトラブル解決方法を探す", description: "Wi-Fi、通知、音声、バッテリー、画面などの困りごとから解決方法を探せます。", alternates: { canonical: "/diagnose" } };
 
 type Target = { label: string; slug: string; os: OSType };
 type Option = { label: string; query: string; targets: Target[] };

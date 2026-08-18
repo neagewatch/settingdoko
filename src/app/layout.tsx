@@ -8,14 +8,14 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
-  title: { default: "設定どこ？ - PC・スマホの設定ナビ", template: "%s | 設定どこ？" },
-  description: "「設定の場所がわからない」を最速で解決。Windows 11・iPhone・Android・Macの設定場所を検索して、最短導線で設定にたどりつけます。",
+  title: { default: "設定どこ？ - 設定方法・トラブル解決ガイド", template: "%s | 設定どこ？" },
+  description: "Windows 11・iPhone・Android・Macの設定方法とトラブル解決を検索。困りごとから最短手順へ案内します。",
   openGraph: {
-    title: "設定どこ？ - PC・スマホの設定ナビ",
-    description: "「設定の場所がわからない」を最速で解決。設定場所を検索できます。",
+    title: "設定どこ？ - 設定方法・トラブル解決ガイド",
+    description: "設定場所がわからない、うまく動かない。Windows 11・iPhone・Android・Macの解決方法を検索できます。",
     type: "website", locale: "ja_JP", siteName: "設定どこ？", url: BASE_URL,
   },
-  twitter: { card: "summary_large_image", title: "設定どこ？ - PC・スマホの設定ナビ", description: "やりたい設定の場所と最短手順を検索できます。" },
+  twitter: { card: "summary_large_image", title: "設定どこ？ - 設定方法・トラブル解決ガイド", description: "設定方法とトラブル解決を、困っていることばで検索できます。" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -45,10 +45,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/advertising" style={{ color: "var(--text-muted)", textDecoration: "none" }}>広告・アフィリエイト</Link>
           </div>
           <div className="site-footer-copy">
-            © 2026 設定どこ？ — PC・スマホの設定場所を最速で探す
+            © 2026 設定どこ？ — PC・スマホの設定とトラブルを最短で解決
           </div>
           <div className="site-footer-note">
-            Windows 11 / iPhone iOS / Android / macOS の設定ナビゲーションサービス
+            Windows 11 / iPhone iOS / Android / macOS の設定・トラブル解決サービス
           </div>
         </footer>
       </body>

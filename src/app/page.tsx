@@ -7,8 +7,8 @@ import type { Metadata } from "next";
 
 export const revalidate = 60;
 export const metadata: Metadata = {
-  title: "設定、どこ？｜Windows 11・iPhone・Android・Macの設定検索",
-  description: "通知、明るさ、Wi-Fi、マイクなど、Windows 11・iPhone・Android・Macでやりたい設定の場所と最短手順を検索できます。",
+  title: "設定どこ？｜設定方法・トラブル解決ガイド",
+  description: "Windows 11・iPhone・Android・Macの設定方法とトラブル解決を検索。通知、Wi-Fi、音が出ない、マイクが使えないなどの困りごとを最短手順で解決します。",
   alternates: { canonical: "/" },
 };
 
@@ -45,7 +45,7 @@ export default async function Home() {
       <section className="home-hero" aria-labelledby="home-title">
         <div className="home-hero-copy">
           <h1 id="home-title">設定どこ？</h1>
-          <p className="home-subtitle">Windows 11・iPhone・Android・Macの設定方法を紹介</p>
+          <p className="home-subtitle">設定方法とトラブル解決を、最短で案内</p>
           <div className="home-supported home-supported-focus" aria-label="重点対応端末">
             <strong>重点対応</strong>
             <span>Windows 11</span>
@@ -55,8 +55,8 @@ export default async function Home() {
           </div>
         </div>
 
-        <div className="home-search-panel" aria-label="設定を検索">
-          <div className="search-panel-kicker"><strong>検索</strong><span>困っていることを、そのまま入力</span></div>
+        <div className="home-search-panel" aria-label="設定・トラブルを検索">
+          <div className="search-panel-kicker"><strong>設定・トラブル検索</strong><span>困っていることを、そのまま入力</span></div>
           <SearchBox large showButton />
           <p className="search-panel-example">例：通知うるさい・拡張子見たい・マイク使えない</p>
           <div className="search-panel-foot"><kbd className="kbd">/</kbd><span>キーでいつでも検索欄へ移動</span></div>
@@ -86,11 +86,11 @@ export default async function Home() {
         <div className="section-heading-row">
           <div>
             <p className="section-index">症状から / BY SYMPTOM</p>
-            <h2 id="diagnose-title">困りごとから探す</h2>
+            <h2 id="diagnose-title">トラブルを解決する</h2>
           </div>
-          <Link href="/diagnose" className="section-link">症状を選ぶ →</Link>
+          <Link href="/diagnose" className="section-link">解決方法を探す →</Link>
         </div>
-        <p style={{ margin: 0, color: "var(--text-secondary)", lineHeight: 1.8 }}>「Wi-Fiがつながらない」「通知が届かない」など、症状を選んで解決方法を探せます。</p>
+        <p style={{ margin: 0, color: "var(--text-secondary)", lineHeight: 1.8 }}>「Wi-Fiがつながらない」「音が出ない」「通知が届かない」など、症状から原因確認と解決方法を探せます。</p>
       </section>
 
       <div className="home-two-column">

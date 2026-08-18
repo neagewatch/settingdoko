@@ -113,7 +113,7 @@ export default function SearchBox({
   return (
     <div className={`search-box-layout ${showButton ? "search-box-with-button" : ""}`}>
       <div ref={containerRef} className="search-box-input-wrap" style={{ position: "relative" }}>
-      <label htmlFor={inputId} className="sr-only">設定を検索</label>
+      <label htmlFor={inputId} className="sr-only">設定・トラブルを検索</label>
       <span aria-hidden="true" style={{
         position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)",
         fontSize: large ? 20 : 16, color: "var(--text-muted)", pointerEvents: "none", zIndex: 1,
@@ -127,7 +127,7 @@ export default function SearchBox({
         onChange={(e) => setQuery(e.target.value.slice(0, 120))}
         onKeyDown={handleKeyDown}
         onFocus={() => suggestions.length > 0 && setOpen(true)}
-        placeholder={large ? "例：通知うるさい、拡張子見たい、マイク使えない" : "設定を検索…"}
+        placeholder={large ? "例：通知うるさい、拡張子見たい、マイク使えない" : "設定・トラブルを検索…"}
         style={large ? { padding: "18px 52px 18px 52px", fontSize: 18, borderRadius: 16 } : {}}
         autoComplete="off"
         role="combobox"

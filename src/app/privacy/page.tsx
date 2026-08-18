@@ -16,7 +16,7 @@ export default function PrivacyPage() {
     <article className="prose-page" style={{ padding: "40px 0 72px", maxWidth: 760 }}>
       <h1>プライバシー</h1>
       <p className="legal-date">最終更新日：{LAST_UPDATED}</p>
-      <p>設定どこ？（以下「当サイト」）は、設定場所を検索するサービスを提供するために必要な範囲で情報を取り扱います。</p>
+      <p>設定どこ？（以下「当サイト」）は、設定方法とトラブル解決方法を検索するサービスを提供するために必要な範囲で情報を取り扱います。</p>
 
       <h2>1. 運営者・問い合わせ先</h2>
       <p>公開名：{OPERATOR_NAME}</p>
