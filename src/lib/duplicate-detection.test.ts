@@ -85,6 +85,7 @@ test("旧トラブルパックだけを削除対象として判定する", () =>
 
 test("指定された条件付きタイトルだけを削除対象として判定する", () => {
   assert.equal(isUnwantedConditionTitle("Wi-Fiにつながらないときの対処（OS更新後）"), true);
+  assert.equal(isUnwantedConditionTitle("アカウントに入れないときの対処（新しい端末から）"), true);
   assert.equal(isUnwantedConditionTitle("Bluetooth機器を追加できないときの対処（新しい端末を追加した場合）"), true);
   assert.equal(isUnwantedConditionTitle("イヤホンが接続済みなのに音が出ない場合"), false);
   assert.equal(isUnwantedConditionTitle("Windows 11で通知をオフにする（Windows版）"), false);

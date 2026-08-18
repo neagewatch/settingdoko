@@ -54,6 +54,7 @@ export const LEGACY_TROUBLESHOOTING_PREFIXES = ["trouble7-", "trouble8-"] as con
 const UNWANTED_CONDITION_LABELS = new Set([
   "OS更新後",
   "新しい端末",
+  "新しい端末から",
   "新しい端末を追加した場合",
   "新しい機器を追加した場合",
   "接続済みなのに音が出ない場合",
