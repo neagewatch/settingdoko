@@ -47,11 +47,30 @@ function normalize(value: unknown): string {
     .replace(/[、。・,./\\:：;；!?！？「」『』（）()［］[\]【】〈〉<>…~〜\-‐‑–—_]/g, "");
 }
 
+export const LEGACY_TROUBLESHOOTING_PREFIXES = ["trouble7-", "trouble8-"] as const;
+
+// 発生場面だけをタイトル末尾に付けた自動生成記事は、基本記事へまとめる。
+// 「Windows版」「Web版」など、読者が選ぶ意味のある派生記事は対象にしない。
+const UNWANTED_CONDITION_LABELS = new Set([
+  "OS更新後",
+  "新しい端末",
+  "新しい端末を追加した場合",
+  "新しい機器を追加した場合",
+  "接続済みなのに音が出ない場合",
+  "接続済みなのに音が出ないとき",
+  "ブラウザ更新後",
+].map(normalize));
+
 function titleKey(title: string): string {
   return normalize(title);
 }
 
 const VARIANT_TITLE_PATTERN = /^(.*?)[（(]([^（）()]+)[）)]$/;
+
+export function getVariantTitleLabel(title: string): string | null {
+  const trimmed = title.trim();
+  return trimmed.match(VARIANT_TITLE_PATTERN)?.[2]?.trim() || null;
+}
 
 export function getBaseTitle(title: string): string {
   const trimmed = title.trim();
@@ -60,6 +79,15 @@ export function getBaseTitle(title: string): string {
 
 export function isVariantTitle(title: string): boolean {
   return getBaseTitle(title) !== title.trim();
+}
+
+export function isLegacyTroubleshootingSlug(slug: string): boolean {
+  return LEGACY_TROUBLESHOOTING_PREFIXES.some((prefix) => slug.startsWith(prefix));
+}
+
+export function isUnwantedConditionTitle(title: string): boolean {
+  const label = getVariantTitleLabel(title);
+  return Boolean(label && UNWANTED_CONDITION_LABELS.has(normalize(label)));
 }
 
 const CANONICAL_SLUG_ALIASES: Record<string, string> = {

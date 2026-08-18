@@ -10,6 +10,19 @@ const CONSOLIDATABLE_PREFIXES = [
   "trouble12-high-demand-",
 ];
 
+// 旧トラブルパックと、発生場面だけをタイトル末尾に付けた候補は
+// 今後の下書き取り込みでも再作成しない。
+const LEGACY_TROUBLESHOOTING_PREFIXES = ["trouble7-", "trouble8-"];
+const UNWANTED_CONDITION_LABELS = new Set([
+  "OS更新後",
+  "新しい端末",
+  "新しい端末を追加した場合",
+  "新しい機器を追加した場合",
+  "接続済みなのに音が出ない場合",
+  "接続済みなのに音が出ないとき",
+  "ブラウザ更新後",
+]);
+
 // 同じテーマの古いslugを、基本記事へ寄せるための明示的な対応表。
 // 派生記事を残したまま再取り込みされないよう、候補統合と監査で共通利用する。
 const CANONICAL_SLUG_ALIASES = new Map([
@@ -26,6 +39,23 @@ function isWindowsSigninVariant(slug) {
 
 function unique(values) {
   return [...new Set(values.filter((value) => typeof value === "string" && value.trim()))];
+}
+
+function isLegacyTroubleshootingSlug(slug) {
+  return LEGACY_TROUBLESHOOTING_PREFIXES.some((prefix) => slug.startsWith(prefix));
+}
+
+function conditionLabel(title) {
+  if (typeof title !== "string") return "";
+  return title.trim().match(/[（(]([^（）()]+)[）)]$/)?.[1]?.trim() || "";
+}
+
+function isUnwantedConditionTitle(title) {
+  return UNWANTED_CONDITION_LABELS.has(conditionLabel(title));
+}
+
+function shouldSkipCandidate(item) {
+  return isLegacyTroubleshootingSlug(item?.slug || "") || isUnwantedConditionTitle(item?.title);
 }
 
 function variantLabel(item) {
@@ -113,12 +143,13 @@ function grouped(items) {
 }
 
 function consolidateCandidates(items) {
-  const groups = grouped(items);
+  const filteredItems = items.filter((item) => !shouldSkipCandidate(item));
+  const groups = grouped(filteredItems);
   const groupByKey = new Map(groups.map((group) => [group.key, group.items]));
   const emitted = new Set();
   const result = [];
 
-  for (const item of items) {
+  for (const item of filteredItems) {
     const key = getConsolidationKey(item);
     const group = key ? groupByKey.get(key) : null;
     if (!group) {
@@ -133,12 +164,15 @@ function consolidateCandidates(items) {
 }
 
 function getConsolidationReport(items) {
-  const groups = grouped(items);
+  const filteredItems = items.filter((item) => !shouldSkipCandidate(item));
+  const groups = grouped(filteredItems);
+  const duplicateRows = groups.reduce((sum, group) => sum + group.items.length - 1, 0);
   return {
     groups: groups.length,
     before: items.length,
-    after: items.length - groups.reduce((sum, group) => sum + group.items.length - 1, 0),
-    duplicateRows: groups.reduce((sum, group) => sum + group.items.length - 1, 0),
+    after: filteredItems.length - duplicateRows,
+    duplicateRows,
+    skippedRows: items.length - filteredItems.length,
     details: groups.map((group) => ({
       key: group.key,
       count: group.items.length,
@@ -159,11 +193,14 @@ function mergeConsolidationGroup(items) {
 export {
   CANONICAL_SLUG_ALIASES,
   CONSOLIDATABLE_PREFIXES,
+  LEGACY_TROUBLESHOOTING_PREFIXES,
   consolidateCandidates,
   getCanonicalSlug,
   getConsolidationGroups,
   getConsolidationKey,
   getConsolidationReport,
+  isLegacyTroubleshootingSlug,
+  isUnwantedConditionTitle,
   isWindowsSigninVariant,
   mergeConsolidationGroup,
 };

@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllSettings } from "@/lib/data";
-import { canonicalSlug, detectDuplicateGroups, isStrongDuplicateGroup, isVariantTitle } from "@/lib/duplicate-detection";
+import {
+  canonicalSlug,
+  detectDuplicateGroups,
+  getBaseTitle,
+  isLegacyTroubleshootingSlug,
+  isStrongDuplicateGroup,
+  isUnwantedConditionTitle,
+  isVariantTitle,
+} from "@/lib/duplicate-detection";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { requireSameOrigin } from "@/lib/request-security";
 import { serverSupabase } from "@/lib/server-supabase";
@@ -12,7 +20,7 @@ export const dynamic = "force-dynamic";
 const DELETE_CHUNK_SIZE = 100;
 const MAX_DELETE_ITEMS = 500;
 const AUTO_MERGE_DELETE_CHUNK_SIZE = 100;
-const MAX_AUTO_MERGE_DELETE_ITEMS = 5000;
+const MAX_AUTO_MERGE_DELETE_ITEMS = 10000;
 
 function chunks<T>(items: T[], size: number): T[][] {
   const result: T[][] = [];
@@ -26,6 +34,35 @@ function isValidSettingId(value: unknown): value is string {
 
 function uniqueStrings(values: unknown[]): string[] {
   return [...new Set(values.filter((value): value is string => typeof value === "string" && value.trim().length > 0).map((value) => value.trim()))];
+}
+
+function titleKey(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ja-JP")
+    .replace(/[\s\u3000]+/g, "")
+    .replace(/[、。・,./\\:：;；!?！？「」『』（）()［］[\]【】〈〉<>…~〜\-‐‑–—_]/g, "");
+}
+
+type CleanupTarget = Setting & { cleanupReason: "legacy-pack" | "condition-variant" };
+
+function getCleanupTargets(settings: Setting[]): {
+  legacyTargets: CleanupTarget[];
+  conditionTargets: CleanupTarget[];
+  targets: CleanupTarget[];
+} {
+  const legacyTargets = settings
+    .filter((setting) => isLegacyTroubleshootingSlug(setting.slug))
+    .map((setting) => ({ ...setting, cleanupReason: "legacy-pack" as const }));
+  const legacyIds = new Set(legacyTargets.map((setting) => setting.id));
+  const conditionTargets = settings
+    .filter((setting) => !legacyIds.has(setting.id) && isUnwantedConditionTitle(setting.title))
+    .map((setting) => ({ ...setting, cleanupReason: "condition-variant" as const }));
+  return {
+    legacyTargets,
+    conditionTargets,
+    targets: [...legacyTargets, ...conditionTargets],
+  };
 }
 
 function chooseKeeper(items: Setting[]): Setting {
@@ -55,9 +92,9 @@ type MergePlan = {
   duplicateIds: string[];
 };
 
-function getMergePlans(settings: Setting[]): MergePlan[] {
+function getMergePlans(settings: Setting[], groups = detectDuplicateGroups(settings)): MergePlan[] {
   const byId = new Map(settings.map((setting) => [setting.id, setting]));
-  return detectDuplicateGroups(settings)
+  return groups
     .filter(isStrongDuplicateGroup)
     .map((group) => {
       const items = group.items.map((item) => byId.get(item.id)).filter((item): item is Setting => Boolean(item));
@@ -72,14 +109,26 @@ function getMergePlans(settings: Setting[]): MergePlan[] {
     .filter((plan) => plan.items.length >= 2 && plan.duplicateIds.length > 0);
 }
 
-function getReport(settings: Setting[], groups = detectDuplicateGroups(settings)) {
+function getReport(settings: Setting[]) {
+  const { legacyTargets, conditionTargets, targets } = getCleanupTargets(settings);
+  const cleanupIds = new Set(targets.map((setting) => setting.id));
+  const mergeSettings = settings.filter((setting) => !cleanupIds.has(setting.id));
+  const groups = detectDuplicateGroups(mergeSettings);
   const mergeableGroups = groups.filter(isStrongDuplicateGroup);
+  const mergePlans = getMergePlans(mergeSettings, groups);
+  const duplicateIds = new Set(mergePlans.flatMap((plan) => plan.duplicateIds));
+  const allDeleteIds = new Set([...duplicateIds, ...cleanupIds]);
   return {
     totalArticles: settings.length,
     totalGroups: groups.length,
-    autoMergeGroups: mergeableGroups.length,
-    autoDeleteItems: mergeableGroups.reduce((sum, group) => sum + group.items.length - 1, 0),
+    autoMergeGroups: mergePlans.length,
+    duplicateDeleteItems: duplicateIds.size,
+    legacyDeleteItems: legacyTargets.length,
+    conditionDeleteItems: conditionTargets.length,
+    cleanupDeleteItems: cleanupIds.size,
+    autoDeleteItems: allDeleteIds.size,
     reviewGroups: groups.length - mergeableGroups.length,
+    groups,
   };
 }
 
@@ -88,11 +137,9 @@ export async function GET() {
 
   try {
     const settings = await getAllSettings(true);
-    const groups = detectDuplicateGroups(settings);
     return NextResponse.json({
       ok: true,
-      ...getReport(settings, groups),
-      groups,
+      ...getReport(settings),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[api/admin/duplicates] read failed", error);
@@ -116,19 +163,24 @@ export async function POST(request: NextRequest) {
 
   try {
     const settings = await getAllSettings(true);
-    const groups = detectDuplicateGroups(settings);
-    const report = getReport(settings, groups);
+    const report = getReport(settings);
     if (!execute) return NextResponse.json({ ok: true, dryRun: true, ...report });
     if (report.autoDeleteItems > MAX_AUTO_MERGE_DELETE_ITEMS) {
-      return NextResponse.json({ error: `一度に整理できる重複記事は${MAX_AUTO_MERGE_DELETE_ITEMS}件までです。先に候補を確認してください`, ...report }, { status: 409 });
+      return NextResponse.json({ error: `一度に整理できる記事の整理は${MAX_AUTO_MERGE_DELETE_ITEMS}件までです。先に候補を確認してください`, ...report }, { status: 409 });
     }
 
-    const plans = getMergePlans(settings);
+    const { targets: cleanupTargets } = getCleanupTargets(settings);
+    const cleanupIds = new Set(cleanupTargets.map((setting) => setting.id));
+    const mergeSettings = settings.filter((setting) => !cleanupIds.has(setting.id));
+    const plans = getMergePlans(mergeSettings);
     const duplicateIds = [...new Set(plans.flatMap((plan) => plan.duplicateIds))];
     const duplicateIdSet = new Set(duplicateIds);
+    const deleteIds = [...new Set([...duplicateIds, ...cleanupTargets.map((setting) => setting.id)])];
+    const deleteIdSet = new Set(deleteIds);
     const updates = new Map<string, Record<string, unknown>>();
     const replacements = new Map<string, string>();
     const keeperIds = new Set<string>();
+    const idBySlug = new Map(settings.map((setting) => [setting.slug, setting.id]));
 
     for (const plan of plans) {
       keeperIds.add(plan.keeper.id);
@@ -137,13 +189,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 条件付き記事は、同じOS・カテゴリの基本記事があれば関連リンクをそこへ寄せる。
+    // 対応先がない場合は、関連リンクから削除してリンク切れを残さない。
+    const baseTitleCandidates = new Map<string, Setting[]>();
+    for (const setting of mergeSettings) {
+      const key = `${setting.os}\u0000${setting.category}\u0000${titleKey(getBaseTitle(setting.title))}`;
+      const candidates = baseTitleCandidates.get(key) || [];
+      candidates.push(setting);
+      baseTitleCandidates.set(key, candidates);
+    }
+    for (const target of cleanupTargets) {
+      const key = `${target.os}\u0000${target.category}\u0000${titleKey(getBaseTitle(target.title))}`;
+      const keeper = [...(baseTitleCandidates.get(key) || [])]
+        .filter((setting) => setting.id !== target.id && !deleteIdSet.has(setting.id))
+        .sort((left, right) => {
+          const leftBase = isVariantTitle(left.title) ? 0 : 1;
+          const rightBase = isVariantTitle(right.title) ? 0 : 1;
+          if (leftBase !== rightBase) return rightBase - leftBase;
+          const leftPublished = left.status === "published" ? 1 : 0;
+          const rightPublished = right.status === "published" ? 1 : 0;
+          if (leftPublished !== rightPublished) return rightPublished - leftPublished;
+          return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+        })[0];
+      if (keeper) replacements.set(target.slug, keeper.slug);
+    }
+
+    const rewriteRelatedSlugs = (slugs: string[]) => uniqueStrings(
+      slugs
+        .map((slug) => {
+          if (replacements.has(slug)) return replacements.get(slug) || null;
+          return deleteIdSet.has(idBySlug.get(slug) || "") ? null : slug;
+        })
+        .filter((slug): slug is string => Boolean(slug)),
+    );
+
     for (const plan of plans) {
       const publishedItems = plan.items
         .filter((item) => item.status === "published")
         .sort((left, right) => new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime());
-      const mergedRelatedSlugs = uniqueStrings(
-        plan.items.flatMap((item) => item.related_slugs).map((slug) => replacements.get(slug) || slug),
-      ).filter((slug) => slug !== plan.keeper.slug);
+      const mergedRelatedSlugs = rewriteRelatedSlugs(plan.items.flatMap((item) => item.related_slugs))
+        .filter((slug) => slug !== plan.keeper.slug);
       const publishedAt = publishedItems[0]?.published_at || new Date().toISOString();
       updates.set(plan.keeper.id, {
         aliases: uniqueStrings(plan.items.flatMap((item) => item.aliases)),
@@ -155,9 +240,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 他の記事から削除対象への関連リンクが残らないよう、keeperへ付け替える。
-    for (const setting of settings) {
+    for (const setting of mergeSettings) {
       if (duplicateIdSet.has(setting.id) || keeperIds.has(setting.id)) continue;
-      const relatedSlugs = uniqueStrings(setting.related_slugs.map((slug) => replacements.get(slug) || slug));
+      const relatedSlugs = rewriteRelatedSlugs(setting.related_slugs);
       if (relatedSlugs.join("\u0000") !== setting.related_slugs.join("\u0000")) {
         updates.set(setting.id, { related_slugs: relatedSlugs });
       }
@@ -171,7 +256,7 @@ export async function POST(request: NextRequest) {
     }
 
     let deletedRows = 0;
-    for (const idChunk of chunks(duplicateIds, AUTO_MERGE_DELETE_CHUNK_SIZE)) {
+    for (const idChunk of chunks(deleteIds, AUTO_MERGE_DELETE_CHUNK_SIZE)) {
       const { data, error } = await serverSupabase
         .from("settings")
         .delete()
@@ -188,6 +273,8 @@ export async function POST(request: NextRequest) {
       mergedGroups: plans.length,
       updatedRows,
       deletedRows,
+      legacyDeletedRows: cleanupTargets.filter((setting) => setting.cleanupReason === "legacy-pack").length,
+      conditionDeletedRows: cleanupTargets.filter((setting) => setting.cleanupReason === "condition-variant").length,
       reviewGroups: report.reviewGroups,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

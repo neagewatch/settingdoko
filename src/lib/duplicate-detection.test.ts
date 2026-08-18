@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canonicalSlug, detectDuplicateGroups, isStrongDuplicateGroup } from "./duplicate-detection";
+import {
+  canonicalSlug,
+  detectDuplicateGroups,
+  isLegacyTroubleshootingSlug,
+  isStrongDuplicateGroup,
+  isUnwantedConditionTitle,
+} from "./duplicate-detection";
 import type { Setting } from "./types";
 
 function setting(slug: string): Setting {
@@ -68,4 +74,18 @@ test("同じslugでもOSが違う記事は別記事として扱う", () => {
   const windows = setting("network-settings");
   const iphone = { ...setting("network-settings"), id: "iphone-network-settings", os: "ios" as const };
   assert.equal(detectDuplicateGroups([windows, iphone]).length, 0);
+});
+
+test("旧トラブルパックだけを削除対象として判定する", () => {
+  assert.equal(isLegacyTroubleshootingSlug("trouble7-win11-wifi"), true);
+  assert.equal(isLegacyTroubleshootingSlug("trouble8-iphone-bluetooth"), true);
+  assert.equal(isLegacyTroubleshootingSlug("trouble9-android-wifi"), false);
+  assert.equal(isLegacyTroubleshootingSlug("trouble-win11-wifi"), false);
+});
+
+test("指定された条件付きタイトルだけを削除対象として判定する", () => {
+  assert.equal(isUnwantedConditionTitle("Wi-Fiにつながらないときの対処（OS更新後）"), true);
+  assert.equal(isUnwantedConditionTitle("Bluetooth機器を追加できないときの対処（新しい端末を追加した場合）"), true);
+  assert.equal(isUnwantedConditionTitle("イヤホンが接続済みなのに音が出ない場合"), false);
+  assert.equal(isUnwantedConditionTitle("Windows 11で通知をオフにする（Windows版）"), false);
 });

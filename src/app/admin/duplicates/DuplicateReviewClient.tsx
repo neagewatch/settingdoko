@@ -11,6 +11,10 @@ type DuplicateResponse = {
   totalArticles: number;
   totalGroups: number;
   autoMergeGroups: number;
+  duplicateDeleteItems: number;
+  legacyDeleteItems: number;
+  conditionDeleteItems: number;
+  cleanupDeleteItems: number;
   autoDeleteItems: number;
   reviewGroups: number;
   groups: DuplicateGroup[];
@@ -100,11 +104,14 @@ export default function DuplicateReviewClient() {
     }
   }
 
-  async function mergeAllStrongDuplicates() {
+  async function cleanupAllDuplicates() {
     const count = data?.autoDeleteItems ?? 0;
     if (count === 0 || merging || deleting) return;
+    const duplicateCount = data?.duplicateDeleteItems ?? 0;
+    const legacyCount = data?.legacyDeleteItems ?? 0;
+    const conditionCount = data?.conditionDeleteItems ?? 0;
     const confirmed = window.confirm(
-      `一致・高確度の重複を${count}件削除し、各グループ1件に整理します。\n\n公開記事が含まれる場合は、公開中の記事を優先して残します。タイトルが似ているだけの「要確認」候補は変更しません。\n\nこの操作は元に戻せません。続けますか？`,
+      `合計${count}件を整理します。\n\n・高確度の重複 ${duplicateCount}件は各グループ1件に統合\n・旧trouble7/trouble8 ${legacyCount}件は削除\n・指定された条件付き記事 ${conditionCount}件は削除\n\ntrouble9と通常記事は残します。公開記事も削除対象になる場合があります。\nタイトルが似ているだけの「要確認」候補は変更しません。\n\nこの操作は元に戻せません。続けますか？`,
     );
     if (!confirmed) return;
 
@@ -117,7 +124,7 @@ export default function DuplicateReviewClient() {
         body: JSON.stringify({ execute: true }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || "重複記事を一括整理できませんでした");
+      if (!response.ok) throw new Error(body.error || "記事を一括整理できませんでした");
       window.alert(`${body.mergedGroups ?? 0}グループを整理し、${body.deletedRows ?? 0}件を削除しました。`);
       await loadDuplicates(true);
     } catch (reason) {
@@ -144,17 +151,17 @@ export default function DuplicateReviewClient() {
           <div>
             <h2 style={{ margin: 0, fontSize: 18 }}>重複候補の確認</h2>
             <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 13 }}>
-              全{data?.totalArticles ?? 0}記事を確認しています。一致・高確度の重複は自動で1件に整理できます。
+              全{data?.totalArticles ?? 0}記事を確認しています。重複の統合と、指定された旧・条件付き記事の整理ができます。
             </p>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
             {(data?.autoDeleteItems ?? 0) > 0 && (
               <button
                 type="button"
-                onClick={() => void mergeAllStrongDuplicates()}
+                onClick={() => void cleanupAllDuplicates()}
                 disabled={refreshing || deleting || merging}
                 style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#B91C1C", cursor: merging ? "wait" : "pointer", fontSize: 12, fontWeight: 700 }}
-              >{merging ? "整理中…" : `重複を一括整理（${data?.autoDeleteItems}件）`}</button>
+              >{merging ? "整理中…" : `重複・旧記事を一括整理（${data?.autoDeleteItems}件）`}</button>
             )}
             <button
               type="button"
@@ -167,6 +174,8 @@ export default function DuplicateReviewClient() {
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 16, fontSize: 13 }}>
           <span>候補グループ <strong>{data?.totalGroups ?? 0}</strong>件</span>
           <span style={{ color: "#B91C1C" }}>一括整理対象 {data?.autoDeleteItems ?? 0}件</span>
+          <span style={{ color: "#7F1D1D" }}>旧trouble7/8 {data?.legacyDeleteItems ?? 0}件</span>
+          <span style={{ color: "#7F1D1D" }}>条件付き {data?.conditionDeleteItems ?? 0}件</span>
           <span style={{ color: "#92400E" }}>要確認 {data?.reviewGroups ?? 0}グループ</span>
           <span style={{ color: "#166534" }}>高確度は「一致」</span>
           <span style={{ color: "#92400E" }}>中確度は「要確認」</span>
