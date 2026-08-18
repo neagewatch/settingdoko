@@ -17,6 +17,7 @@ export interface SettingRevision { id: string; setting_id: string; snapshot: Set
 export interface ContentReport { id: string; setting_id: string; title: string; comment?: string | null; status: "new" | "reviewing" | "done"; created_at: string; }
 export interface ServerZeroHitSearch { query: string; os: string | null; count: number; last_seen_at: string; }
 export interface SettingPageResult { items: Setting[]; total: number; }
+export type OSCategoryCounts = Record<string, number>;
 
 const PUBLIC_COLUMNS = "id,title,slug,os,version,category,aliases,path,steps,related_slugs,keywords,description,updated_at,view_count,helpful_count,difficulty,estimate_minutes,screenshot_url,status,published_at,verified_at,source_url,device_scope,impact,rollback,caution,review_due_at";
 const ADMIN_COLUMNS = `${PUBLIC_COLUMNS},editor_note`;
@@ -33,6 +34,7 @@ const SETTINGS_MAX_PAGES = 200;
 let publicSettingsCache: { data: Setting[]; expiresAt: number } | null = null;
 let publicSettingsRequest: Promise<Setting[]> | null = null;
 const categoryPageCache = new Map<string, { data: SettingPageResult; expiresAt: number }>();
+const osCategoryCountsCache = new Map<string, { data: OSCategoryCounts; expiresAt: number }>();
 
 export class DataAccessError extends Error {
   constructor(message = "データベースに接続できませんでした") {
@@ -172,6 +174,7 @@ async function loadPublishedSettings(): Promise<Setting[]> {
 export function clearPublicSettingsCache() {
   publicSettingsCache = null;
   categoryPageCache.clear();
+  osCategoryCountsCache.clear();
 }
 
 export async function getAllSettings(includeDrafts = false): Promise<Setting[]> {
@@ -201,6 +204,103 @@ export async function getSettingsByOS(os: OSType): Promise<Setting[]> {
   return (await loadPublishedSettings())
     .filter((s) => s.os === os)
     .sort((a, b) => a.category.localeCompare(b.category));
+}
+
+/**
+ * OS一覧ページ用のページ取得。全記事をHTMLへ載せず、OS・小ジャンル・ページ単位で取得する。
+ */
+export async function getSettingsByOSPage(
+  os: OSType,
+  options: { category?: string; page?: number; pageSize?: number } = {},
+): Promise<SettingPageResult> {
+  if (!isOSType(os)) return { items: [], total: 0 };
+  const category = typeof options.category === "string" && options.category.trim()
+    ? options.category.trim().slice(0, 80)
+    : undefined;
+  const pageSize = Math.max(1, Math.min(50, Math.floor(options.pageSize ?? 20)));
+  const page = Math.max(1, Math.min(1000, Math.floor(options.page ?? 1)));
+  const cacheKey = `${os}\u0000${category || ""}\u0000${page}\u0000${pageSize}`;
+  const cached = categoryPageCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  if (USE_SUPABASE) {
+    try {
+      let query = supabase!
+        .from("settings")
+        .select(PUBLIC_COLUMNS, { count: "exact" })
+        .eq("status", "published")
+        .eq("os", os);
+      if (category) query = query.eq("category", category);
+
+      const from = (page - 1) * pageSize;
+      const { data, count, error } = await query
+        .order("category", { ascending: true })
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+
+      const result = {
+        items: (data || []).map((item) => normalizeSetting(item as unknown as Setting)),
+        total: count ?? (data || []).length,
+      };
+      categoryPageCache.set(cacheKey, { data: result, expiresAt: Date.now() + PUBLIC_CACHE_TTL_MS });
+      return result;
+    } catch (error) {
+      logReadFailure("os-page", error);
+    }
+  }
+
+  const fallback = fallbackSettings()
+    .filter((setting) => setting.os === os && (!category || setting.category === category))
+    .sort((left, right) => left.category.localeCompare(right.category) || new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime());
+  const from = (page - 1) * pageSize;
+  const result = { items: fallback.slice(from, from + pageSize), total: fallback.length };
+  categoryPageCache.set(cacheKey, { data: result, expiresAt: Date.now() + FALLBACK_CACHE_TTL_MS });
+  return result;
+}
+
+/**
+ * OSページの小ジャンル切り替えに使う件数だけを取得する。
+ * 記事本文や手順画像は取得しないため、全件一覧より軽い。
+ */
+export async function getOSCategoryCounts(os: OSType): Promise<OSCategoryCounts> {
+  if (!isOSType(os)) return {};
+  const cached = osCategoryCountsCache.get(os);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  if (USE_SUPABASE) {
+    try {
+      const counts: OSCategoryCounts = {};
+      for (let page = 0; page < SETTINGS_MAX_PAGES; page += 1) {
+        const { data, error } = await supabase!
+          .from("settings")
+          .select("category")
+          .eq("status", "published")
+          .eq("os", os)
+          .order("id", { ascending: true })
+          .range(page * SETTINGS_PAGE_SIZE, (page + 1) * SETTINGS_PAGE_SIZE - 1);
+        if (error) throw error;
+        const rows = data || [];
+        for (const row of rows as Array<{ category?: unknown }>) {
+          if (typeof row.category !== "string" || !row.category) continue;
+          counts[row.category] = (counts[row.category] || 0) + 1;
+        }
+        if (rows.length < SETTINGS_PAGE_SIZE) break;
+      }
+      osCategoryCountsCache.set(os, { data: counts, expiresAt: Date.now() + PUBLIC_CACHE_TTL_MS });
+      return counts;
+    } catch (error) {
+      logReadFailure("os-category-counts", error);
+    }
+  }
+
+  const counts: OSCategoryCounts = {};
+  for (const setting of fallbackSettings().filter((item) => item.os === os)) {
+    counts[setting.category] = (counts[setting.category] || 0) + 1;
+  }
+  osCategoryCountsCache.set(os, { data: counts, expiresAt: Date.now() + FALLBACK_CACHE_TTL_MS });
+  return counts;
 }
 
 /**

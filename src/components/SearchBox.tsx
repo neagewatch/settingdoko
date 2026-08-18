@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef, useId } from "react";
 import { useRouter } from "next/navigation";
 import { logSearch } from "@/lib/analytics";
-import { Setting } from "@/lib/types";
+import { OSType, Setting } from "@/lib/types";
 import OSBadge from "./OSBadge";
 
 type SearchSuggestion = Pick<Setting, "id" | "title" | "slug" | "os" | "version" | "category" | "description" | "path" | "verified_at">;
@@ -14,10 +14,12 @@ export default function SearchBox({
   defaultValue,
   large,
   showButton = false,
+  os,
 }: {
   defaultValue?: string;
   large?: boolean;
   showButton?: boolean;
+  os?: OSType;
 }) {
   const [query, setQuery] = useState(defaultValue || "");
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
@@ -44,7 +46,9 @@ export default function SearchBox({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&limit=6`, { signal: controller.signal });
+        const params = new URLSearchParams({ q: searchQuery, limit: "6" });
+        if (os) params.set("os", os);
+        const res = await fetch(`/api/search?${params.toString()}`, { signal: controller.signal });
         if (!res.ok) return;
         const data = await res.json() as SearchSuggestion[];
         if (controller.signal.aborted) return;
@@ -59,7 +63,7 @@ export default function SearchBox({
       if (debounceRef.current) clearTimeout(debounceRef.current);
       abortRef.current?.abort();
     };
-  }, [query]);
+  }, [query, os]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -81,8 +85,10 @@ export default function SearchBox({
     // 実際の検索結果件数は検索結果ページでSearchTelemetryが記録する。
     // 候補件数をゼロ件検索として扱うと誤判定になるため、ここでは未確定(-1)にする。
     logSearch(searchQ, -1);
-    router.push(`/search?q=${encodeURIComponent(searchQ)}`);
-  }, [query, router]);
+    const params = new URLSearchParams({ q: searchQ });
+    if (os) params.set("os", os);
+    router.push(`/search?${params.toString()}`);
+  }, [os, query, router]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open) {
