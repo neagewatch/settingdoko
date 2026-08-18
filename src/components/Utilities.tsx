@@ -1,6 +1,8 @@
 "use client";
+/* localStorageの表示設定を初回クライアント表示へ同期するeffect。 */
+/* eslint-disable react-hooks/set-state-in-effect */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { getStepText, SettingStep } from "@/lib/types";
 
 export function CopyStepsButton({ steps, path }: { steps: SettingStep[]; path: string[] }) {
@@ -22,7 +24,7 @@ export function CopyStepsButton({ steps, path }: { steps: SettingStep[]; path: s
 
   return (
     <button className={`copy-btn ${copied ? "copied" : ""}`} onClick={handleCopy}>
-      {copied ? "✓ コピー済み" : "📋 手順をコピー"}
+      {copied ? "✓ コピー済み" : "手順をコピー"}
     </button>
   );
 }

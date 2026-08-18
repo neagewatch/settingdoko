@@ -1,26 +1,28 @@
-import { ImageResponse } from "@vercel/og";
+import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const title = searchParams.get("title") || "設定どこ？";
+  const title = (searchParams.get("title") || "設定どこ？").slice(0, 160);
   const os = searchParams.get("os") || "";
-  const path = searchParams.get("path") || "";
+  const path = (searchParams.get("path") || "").slice(0, 300);
 
   const osColors: Record<string, string> = {
-    windows11: "#0078D4",
-    ios: "#1D1D1F",
-    macos: "#1D1D1F",
+    windows11: "#176B87",
+    ios: "#176B87",
+    macos: "#176B87",
+    android: "#176B87",
   };
   const osLabels: Record<string, string> = {
     windows11: "Windows 11",
     ios: "iPhone / iOS",
     macos: "macOS",
+    android: "Android",
   };
 
-  const accentColor = osColors[os] || "#2563EB";
+  const accentColor = osColors[os] || "#E85D2A";
   const osLabel = osLabels[os] || "";
 
   return new ImageResponse(
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
       <div
         style={{
           width: "100%", height: "100%",
-          background: "#F8FAFB",
+          background: "#F3EFE6",
           display: "flex", flexDirection: "column",
           fontFamily: "sans-serif",
           position: "relative",
@@ -41,8 +43,8 @@ export async function GET(request: NextRequest) {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "48px 60px", justifyContent: "center" }}>
           {/* Site name */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
-            <div style={{ fontSize: 36 }}>⚙️</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#64748B" }}>設定どこ？</div>
+            <div style={{ width: 42, height: 42, background: "#E85D2A", color: "#FFFDF8", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, fontWeight: 800 }}>?</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#20262B" }}>設定どこ？</div>
           </div>
 
           {/* OS badge */}
@@ -52,7 +54,7 @@ export async function GET(request: NextRequest) {
               background: `${accentColor}18`,
               color: accentColor,
               border: `1px solid ${accentColor}40`,
-              borderRadius: 8, padding: "6px 16px",
+              borderRadius: 2, padding: "6px 16px",
               fontSize: 18, fontWeight: 600,
               marginBottom: 20, width: "fit-content",
             }}>
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
           )}
 
           {/* Title */}
-          <div style={{ fontSize: 52, fontWeight: 800, color: "#1E293B", lineHeight: 1.2, marginBottom: 24, letterSpacing: "-1px" }}>
+          <div style={{ fontSize: 52, fontWeight: 800, color: "#20262B", lineHeight: 1.2, marginBottom: 24, letterSpacing: "-1px" }}>
             {title}
           </div>
 
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {path.split(" › ").map((segment, i, arr) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ background: "#E2E8F0", padding: "6px 16px", borderRadius: 8, fontSize: 18, color: "#475569", fontWeight: 500 }}>
+                  <div style={{ background: "#EDE7DB", padding: "6px 16px", borderRadius: 2, fontSize: 18, color: "#5D6870", fontWeight: 500 }}>
                     {segment}
                   </div>
                   {i < arr.length - 1 && <div style={{ color: "#CBD5E1", fontSize: 20 }}>›</div>}

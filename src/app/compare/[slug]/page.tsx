@@ -1,10 +1,10 @@
 import { getSettingsBySlug } from "@/lib/data";
 
 export const revalidate = 60;
-import { OS_LABELS, CATEGORIES, getStepText } from "@/lib/types";
+import { getStepText } from "@/lib/types";
 import PathTrail from "@/components/PathTrail";
 import OSBadge from "@/components/OSBadge";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -14,9 +14,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const settings = await getSettingsBySlug(slug);
   if (!settings.length) return { title: "比較" };
+  if (settings.length < 2) return { title: `${settings[0].title}（比較対象なし）`, robots: "noindex" };
   return {
     title: `${settings[0].title} — OS別比較`,
-    description: `${settings[0].title}の設定方法をWindows・iPhone・Macで比較します。`,
+    description: `${settings[0].title}の設定方法をWindows 11・iPhone・Android・Macで比較します。`,
+    alternates: { canonical: `/compare/${slug}` },
   };
 }
 
@@ -24,13 +26,14 @@ export default async function ComparePage({ params }: Props) {
   const { slug } = await params;
   const settings = await getSettingsBySlug(slug);
   if (!settings.length) notFound();
+  if (settings.length < 2) redirect(`/setting/${settings[0].slug}?os=${settings[0].os}`);
 
   const title = settings[0].title;
 
   return (
-    <div style={{ padding: "32px 0 60px" }}>
+    <div className="listing-page compare-page" style={{ padding: "32px 0 60px" }}>
       {/* Breadcrumb */}
-      <div style={{ marginBottom: 24, fontSize: 13, color: "var(--text-muted)" }}>
+      <div className="breadcrumb" style={{ marginBottom: 24, fontSize: 13, color: "var(--text-muted)" }}>
         <Link href="/" style={{ color: "var(--text-muted)", textDecoration: "none" }}>トップ</Link>
         <span style={{ margin: "0 8px" }}>›</span>
         <span>OS比較</span>
@@ -38,18 +41,19 @@ export default async function ComparePage({ params }: Props) {
         <span style={{ color: "var(--text-secondary)" }}>{title}</span>
       </div>
 
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>
+      <p className="section-index">COMPARE / OSを比べる</p>
+      <h1 className="page-title" style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>
         {title}
       </h1>
-      <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 32 }}>
+      <p className="page-subtitle" style={{ marginBottom: 32 }}>
         OS別の設定場所・手順を横並びで比較
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
+      <div className="compare-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
         {settings.map((s) => (
-          <div key={s.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+          <div key={s.id} className="compare-card" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
             {/* Header */}
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}>
+            <div className="compare-card-header" style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}>
               <OSBadge os={s.os} />
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{s.version}</div>
               <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, margin: "10px 0 0" }}>{s.description}</p>
@@ -62,10 +66,10 @@ export default async function ComparePage({ params }: Props) {
             {/* Steps */}
             <div style={{ padding: "16px 20px" }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>手順</p>
-              <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                <ol className="compare-steps" style={{ listStyle: "none", padding: 0, margin: 0 }}>
                 {s.steps.map((step, i) => (
                   <li key={i} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
-                    <span style={{ background: "var(--primary)", color: "white", width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
+                    <span className="compare-step-number" style={{ background: "var(--primary)", color: "white", width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
                     <span style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text)" }}>{getStepText(step)}</span>
                   </li>
                 ))}

@@ -1,9 +1,8 @@
 import { getSettingsByOS } from "@/lib/data";
 
 export const revalidate = 60; // 60秒ごとに再生成
-import { OSType, OS_LABELS, CATEGORIES } from "@/lib/types";
+import { OSType, OS_LABELS, CATEGORIES, PRIMARY_OS_TYPES } from "@/lib/types";
 import SettingCard from "@/components/SettingCard";
-import SearchBox from "@/components/SearchBox";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -18,7 +17,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!label) return { title: "OS Not Found" };
   return {
     title: `${label}の設定一覧`,
-    description: `${label}の設定場所・手順を一覧で検索できます。`,
+    description: `${label}の設定場所・最短手順を、目的とカテゴリから探せます。`,
+    alternates: { canonical: `/os/${os}` },
   };
 }
 
@@ -39,9 +39,9 @@ export default async function OSPage({ params }: Props) {
   }
 
   return (
-    <div style={{ padding: "32px 0" }}>
+    <div className="listing-page os-page" style={{ padding: "32px 0" }}>
       {/* Breadcrumb */}
-      <div style={{ marginBottom: 24 }}>
+      <div className="breadcrumb" style={{ marginBottom: 24 }}>
         <Link
           href="/"
           style={{
@@ -58,7 +58,7 @@ export default async function OSPage({ params }: Props) {
         </span>
       </div>
 
-      <h1
+      <h1 className="page-title"
         style={{
           fontSize: 26,
           fontWeight: 700,
@@ -68,7 +68,7 @@ export default async function OSPage({ params }: Props) {
       >
         {OS_LABELS[osType]} の設定
       </h1>
-      <p
+      <p className="page-subtitle"
         style={{
           fontSize: 15,
           color: "var(--text-secondary)",
@@ -79,8 +79,8 @@ export default async function OSPage({ params }: Props) {
       </p>
 
       {/* OS switcher */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 32 }}>
-        {(["windows11", "ios", "macos", "android"] as const).map((o) => (
+      <div className="os-switcher" style={{ display: "flex", gap: 8, marginBottom: 32 }}>
+        {PRIMARY_OS_TYPES.map((o) => (
           <Link
             key={o}
             href={`/os/${o}`}
@@ -94,8 +94,8 @@ export default async function OSPage({ params }: Props) {
 
       {/* Grouped settings */}
       {Object.entries(grouped).map(([category, items]) => (
-        <div key={category} style={{ marginBottom: 36 }}>
-          <h2
+        <div key={category} className="category-group" style={{ marginBottom: 36 }}>
+          <h2 className="category-heading"
             style={{
               fontSize: 14,
               fontWeight: 600,
@@ -109,7 +109,7 @@ export default async function OSPage({ params }: Props) {
           >
             {CATEGORIES[category] || category}
           </h2>
-          <div
+          <div className="setting-list"
             style={{ display: "flex", flexDirection: "column", gap: 10 }}
           >
             {items.map((s) => (
@@ -118,6 +118,12 @@ export default async function OSPage({ params }: Props) {
           </div>
         </div>
       ))}
+      {settings.length === 0 && (
+        <div className="empty-state" style={{ padding: "40px 20px", textAlign: "center", border: "1px dashed var(--border)", borderRadius: 12, color: "var(--text-muted)" }}>
+          <p style={{ margin: 0 }}>このOSのガイドは準備中です。</p>
+          <Link href="/" style={{ display: "inline-block", marginTop: 12, color: "var(--primary)" }}>トップで検索する →</Link>
+        </div>
+      )}
     </div>
   );
 }

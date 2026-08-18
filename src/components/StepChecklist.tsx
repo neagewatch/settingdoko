@@ -1,4 +1,6 @@
 "use client";
+/* localStorageのチェック状態を初回クライアント表示へ同期するeffect。 */
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useEffect } from "react";
 import { getProgress, toggleStep, clearProgress } from "@/lib/analytics";
@@ -51,10 +53,11 @@ export default function StepChecklist({
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
-            {allDone ? "✅ 完了！" : `${completed.length} / ${steps.length} 完了`}
+            {allDone ? "完了" : `${completed.length} / ${steps.length} 完了`}
           </span>
           {completed.length > 0 && (
             <button
+              type="button"
               onClick={handleReset}
               style={{ fontSize: 12, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
             >
@@ -72,16 +75,19 @@ export default function StepChecklist({
         {steps.map((step, i) => {
           const done = completed.includes(i);
           return (
-            <li
-              key={i}
-              className={`step-item ${done ? "completed" : ""}`}
-              onClick={() => handleToggle(i)}
-              title="クリックして完了/未完了を切り替え"
-            >
-              <span className="step-number">
-                {done ? "✓" : i + 1}
-              </span>
-              <StepContent step={step} />
+            <li key={i} className={`step-item ${done ? "completed" : ""}`}>
+              <button
+                type="button"
+                className="step-toggle"
+                onClick={() => handleToggle(i)}
+                aria-pressed={done}
+                aria-label={`${i + 1}番目の手順を${done ? "未完了に戻す" : "完了にする"}`}
+              >
+                <span className="step-number" aria-hidden="true">
+                  {done ? "✓" : i + 1}
+                </span>
+                <StepContent step={step} />
+              </button>
             </li>
           );
         })}
@@ -93,7 +99,7 @@ export default function StepChecklist({
           background: "#F0FDF4", border: "1px solid #BBF7D0",
           color: "#15803D", fontSize: 14, fontWeight: 600, textAlign: "center",
         }}>
-          🎉 すべての手順が完了しました！
+          すべての手順が完了しました。
         </div>
       )}
     </div>

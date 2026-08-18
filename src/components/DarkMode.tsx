@@ -1,4 +1,6 @@
 "use client";
+/* localStorageとDOMテーマを初回クライアント表示へ同期するeffect。 */
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState } from "react";
 import { getDarkMode, setDarkMode } from "@/lib/analytics";
@@ -41,7 +43,7 @@ export function DarkModeToggle() {
 
   return (
     <button className="dark-toggle" onClick={toggle} title={dark ? "ライトモード" : "ダークモード"}>
-      {dark ? "☀️" : "🌙"}
+      {dark ? "明" : "暗"}
     </button>
   );
 }

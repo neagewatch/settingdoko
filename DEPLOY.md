@@ -82,6 +82,8 @@ git push -u origin main
    | `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxxxxxxxx.supabase.co` |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` |
 | `NEXT_PUBLIC_BASE_URL` | `https://settingdoko.vercel.app` (後で確定URLに変更) |
+| `NEXT_PUBLIC_OPERATOR_NAME` | 公開ページに表示する公開名 |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | 任意。個人情報に関する補助窓口。問い合わせフォームを主窓口にする場合は空欄可 |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Settings → API の service_role key（サーバー専用・絶対に公開しない） |
 
 5. 「Deploy」をクリック → 1〜2分待つ
@@ -97,6 +99,8 @@ git push -u origin main
 - [ ] ダークモードが切り替わる
 - [ ] `/sitemap.xml` にURLが列挙されている
 - [ ] `/robots.txt` が表示される
+- [ ] `/terms`、`/privacy`、`/contact` が表示される
+- [ ] `NEXT_PUBLIC_OPERATOR_NAME` を本番環境に設定する（`NEXT_PUBLIC_CONTACT_EMAIL` は任意）
 - [ ] `/admin` に設定データ一覧が出る
 - [ ] `/admin` のAI補助でaliasが生成される（要: Anthropic APIキー設定）
 

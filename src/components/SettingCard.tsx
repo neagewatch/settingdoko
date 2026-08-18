@@ -9,7 +9,7 @@ export default function SettingCard({ setting }: { setting: Setting }) {
       href={`/setting/${setting.slug}?os=${setting.os}`}
       className="setting-card"
     >
-      <div
+      <div className="setting-card-meta"
         style={{
           display: "flex",
           alignItems: "center",
@@ -27,7 +27,7 @@ export default function SettingCard({ setting }: { setting: Setting }) {
           {setting.version}
         </span>
       </div>
-      <h3
+      <h3 className="setting-card-title"
         style={{
           fontSize: 17,
           fontWeight: 600,
@@ -38,7 +38,7 @@ export default function SettingCard({ setting }: { setting: Setting }) {
         {setting.title}
       </h3>
       <PathTrail path={setting.path} />
-      <p
+      <p className="setting-card-description"
         style={{
           fontSize: 14,
           color: "var(--text-secondary)",

@@ -1,80 +1,76 @@
 import { searchDB, getAllSettings } from "@/lib/data";
-import { OSType, OS_LABELS, CATEGORIES } from "@/lib/types";
+import { OSType, OS_LABELS, isOSType } from "@/lib/types";
 import SearchBox from "@/components/SearchBox";
 import SettingCard from "@/components/SettingCard";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { searchSettings } from "@/lib/search";
 import ContentRequestForm from "@/components/ContentRequestForm";
+import SearchTelemetry from "@/components/SearchTelemetry";
 
-type Props = { searchParams: Promise<{ q?: string; os?: string; diff?: string }> };
+type Props = { searchParams: Promise<{ q?: string; os?: string }> };
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const { q } = await searchParams;
+  const displayQuery = q?.slice(0, 80);
   return {
-    title: q ? `「${q}」の検索結果` : "検索",
-    description: q ? `「${q}」に関する設定場所・手順の検索結果です。` : "PC・スマホの設定を検索",
+    title: displayQuery ? `「${displayQuery}」の検索結果` : "検索",
+    description: displayQuery ? `「${displayQuery}」に関する設定場所・手順の検索結果です。` : "PC・スマホの設定を検索",
     robots: "noindex",
   };
 }
 
 export default async function SearchPage({ searchParams }: Props) {
-  const { q = "", os, diff } = await searchParams;
-  const osType = os as OSType | undefined;
-  let results = await searchDB(q, osType);
-
-  // 難易度フィルター
-  if (diff) results = results.filter((s) => s.difficulty === diff);
+  const { q: rawQ = "", os } = await searchParams;
+  const q = rawQ.trim().slice(0, 120);
+  const osType = os && isOSType(os) ? os as OSType : undefined;
+  const results = q ? await searchDB(q, osType) : [];
 
   // ゼロヒット時の「もしかして」
   let suggestions: Awaited<ReturnType<typeof searchDB>> = [];
   if (q && results.length === 0) {
     const all = await getAllSettings();
-    // クエリを短くして再検索
-    const shortQ = q.slice(0, Math.ceil(q.length / 2));
-    suggestions = searchSettings(all, shortQ, osType).slice(0, 4);
+    suggestions = searchSettings(all, q, osType).slice(0, 4);
   }
 
   return (
-    <div style={{ padding: "32px 0 60px" }}>
-      <div style={{ marginBottom: 24 }}>
-        <SearchBox defaultValue={q} />
+    <div className="listing-page search-page" style={{ padding: "32px 0 60px" }}>
+      {q && <SearchTelemetry query={q} resultCount={results.length} os={osType} />}
+      <div className="listing-heading">
+        <p className="section-index">SEARCH / 設定を探す</p>
+        <h1>{q ? `「${q}」の検索結果` : "設定を検索"}</h1>
+        <p>正式な設定名が分からなくても、困っていることをそのまま入力できます。</p>
+      </div>
+      <div className="listing-search-box" style={{ marginBottom: 24 }}>
+        <SearchBox defaultValue={q} showButton />
       </div>
 
       {/* フィルターバー */}
       {q && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="filter-bar" style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
           {/* OS filter */}
-          <Link href={`/search?q=${encodeURIComponent(q)}${diff ? `&diff=${diff}` : ""}`} className={`filter-chip ${!os ? "active" : ""}`}>すべてのOS</Link>
+          <Link href={`/search?q=${encodeURIComponent(q)}`} className={`filter-chip ${!os ? "active" : ""}`}>すべてのOS</Link>
           {(["windows11", "ios", "macos", "android"] as const).map((o) => (
-            <Link key={o} href={`/search?q=${encodeURIComponent(q)}&os=${o}${diff ? `&diff=${diff}` : ""}`} className={`filter-chip ${os === o ? "active" : ""}`}>
+            <Link key={o} href={`/search?q=${encodeURIComponent(q)}&os=${o}`} className={`filter-chip ${os === o ? "active" : ""}`}>
               {OS_LABELS[o]}
-            </Link>
-          ))}
-          <div style={{ width: 1, height: 18, background: "var(--border)", margin: "0 4px" }} />
-          {/* Difficulty filter */}
-          <Link href={`/search?q=${encodeURIComponent(q)}${os ? `&os=${os}` : ""}`} className={`filter-chip ${!diff ? "active" : ""}`}>すべての難易度</Link>
-          {[["beginner","初心者"],["intermediate","中級"],["advanced","上級"]].map(([d, label]) => (
-            <Link key={d} href={`/search?q=${encodeURIComponent(q)}${os ? `&os=${os}` : ""}&diff=${d}`} className={`filter-chip ${diff === d ? "active" : ""}`}>
-              {label}
             </Link>
           ))}
         </div>
       )}
 
       {q && (
-        <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 20 }}>
+        <p className="result-count" style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 20 }}>
           「{q}」の検索結果：<strong style={{ color: "var(--text)" }}>{results.length}件</strong>
         </p>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="result-list" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {results.length > 0
           ? results.map((s) => <SettingCard key={s.id} setting={s} />)
           : q
           ? (
-            <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-muted)" }}>
-              <p style={{ fontSize: 40, marginBottom: 12 }}>🔍</p>
+            <div className="empty-search-state" style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-muted)" }}>
+              <p className="empty-search-mark" aria-hidden="true">?</p>
               <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: "var(--text)" }}>
                 「{q}」は見つかりませんでした
               </p>

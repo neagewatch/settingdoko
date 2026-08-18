@@ -1,4 +1,6 @@
 "use client";
+/* localStorageの履歴を初回クライアント表示へ同期するeffect。 */
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState } from "react";
 import { getRecentViews, getBookmarks, ViewLogEntry, Bookmark } from "@/lib/analytics";

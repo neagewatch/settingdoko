@@ -8,12 +8,12 @@ export default function Icon() {
     (
       <div style={{
         width: 32, height: 32,
-        background: "linear-gradient(135deg, #2563EB, #1d4ed8)",
-        borderRadius: 8,
+        background: "#E85D2A",
+        borderRadius: 2,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 20,
+        fontSize: 22, fontWeight: 800, color: "#FFFDF8",
       }}>
-        ⚙️
+        ?
       </div>
     ),
     { ...size }

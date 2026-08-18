@@ -1,4 +1,6 @@
 "use client";
+/* localStorageの状態を初回クライアント表示へ同期するeffect。 */
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useEffect } from "react";
 import { isBookmarked, addBookmark, removeBookmark } from "@/lib/analytics";

@@ -1,6 +1,4 @@
-"use client";
-
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { OS_LABELS, OSType } from "@/lib/types";
 
 const OS_LIST: OSType[] = ["windows11", "ios", "macos", "android"];
@@ -14,8 +12,6 @@ export default function OSTabs({
   slug?: string;
   availableOS?: string[];
 }) {
-  const router = useRouter();
-
   const targets = availableOS
     ? OS_LIST.filter((os) => availableOS.includes(os))
     : OS_LIST;
@@ -23,17 +19,14 @@ export default function OSTabs({
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
       {targets.map((os) => (
-        <button
+        <Link
           key={os}
+          href={slug ? `/setting/${slug}?os=${os}` : `/os/${os}`}
           className={`os-tab ${current === os ? "active" : ""}`}
-          onClick={() => {
-            if (slug) {
-              router.push(`/setting/${slug}?os=${os}`);
-            }
-          }}
+          aria-current={current === os ? "page" : undefined}
         >
           {OS_LABELS[os]}
-        </button>
+        </Link>
       ))}
     </div>
   );

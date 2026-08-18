@@ -12,6 +12,7 @@ export default function OSBadge({ os }: { os: string }) {
   const color = OS_COLORS[os] || "#64748B";
   return (
     <span
+      className="os-badge"
       style={{
         display: "inline-block",
         fontSize: 12,

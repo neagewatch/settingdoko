@@ -1,4 +1,6 @@
 "use client";
+/* 現在URLはブラウザのlocationを初回クライアント表示へ同期する。 */
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useEffect } from "react";
 

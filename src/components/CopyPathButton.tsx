@@ -20,7 +20,7 @@ export default function CopyPathButton({ path }: { path: string[] }) {
       onClick={handleCopy}
       title="導線をコピー"
     >
-      {copied ? "✓ コピー済み" : "📋 コピー"}
+      {copied ? "✓ コピー済み" : "コピー"}
     </button>
   );
 }

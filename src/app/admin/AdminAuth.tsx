@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
 
 export default function AdminAuth({ mfaAvailable, passwordEnabled }: { mfaAvailable: boolean; passwordEnabled: boolean }) {
   const [password, setPassword] = useState("");
@@ -76,7 +77,7 @@ export default function AdminAuth({ mfaAvailable, passwordEnabled }: { mfaAvaila
         </form>}
         {mfaAvailable && factorId && <form onSubmit={verifyMfa}>
           <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 16 }}>{qr ? "認証アプリでQRコードを読み取り、表示された6桁コードを入力してください" : "認証アプリに表示された6桁コードを入力してください"}</p>
-          {qr && <img src={qr} alt="認証アプリ登録用QRコード" style={{ width: 180, height: 180, marginBottom: 16 }} />}
+          {qr && <Image src={qr} alt="認証アプリ登録用QRコード" width={180} height={180} unoptimized style={{ width: 180, height: 180, marginBottom: 16 }} />}
           <input inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="6桁の認証コード" autoFocus required style={input} />
           <button type="submit" disabled={loading || code.length !== 6} style={{ width: "100%", padding: "12px", borderRadius: 8, background: "var(--primary)", color: "white", border: "none", cursor: "pointer", fontSize: 15, fontWeight: 600 }}>{loading ? "確認中…" : "二段階認証でログイン"}</button>
         </form>}

@@ -1,152 +1,165 @@
 import SearchBox from "@/components/SearchBox";
-import { PopularSearches, PopularSettings } from "@/components/PopularRanking";
-import { RecentlyViewed } from "@/components/UserHistory";
 import { KeyboardShortcut } from "@/components/Utilities";
 import Link from "next/link";
-import { OS_LABELS } from "@/lib/types";
+import { OS_LABELS, PRIMARY_OS_TYPES } from "@/lib/types";
 import { getAllSettings } from "@/lib/data";
+import type { Metadata } from "next";
 
 export const revalidate = 60;
+export const metadata: Metadata = {
+  title: "設定、どこ？｜Windows 11・iPhone・Android・Macの設定検索",
+  description: "通知、明るさ、Wi-Fi、マイクなど、Windows 11・iPhone・Android・Macでやりたい設定の場所と最短手順を検索できます。",
+  alternates: { canonical: "/" },
+};
 
-const STATIC_POPULAR = [
-  { label: "拡張子表示", q: "拡張子" },
-  { label: "Bluetooth", q: "Bluetooth" },
-  { label: "画面の明るさ", q: "明るさ" },
-  { label: "マイク許可", q: "マイク" },
-  { label: "通知オフ", q: "通知" },
-  { label: "DNS変更", q: "DNS" },
+const POPULAR_SEARCHES = [
+  { label: "拡張子を表示したい", q: "拡張子見たい" },
+  { label: "通知を止めたい", q: "通知うるさい" },
+  { label: "画面を暗くしたい", q: "画面暗くしたい" },
+  { label: "Wi-Fiが切れる", q: "WiFi切れる" },
+  { label: "マイクが使えない", q: "マイク使えない" },
+  { label: "Bluetoothにつながらない", q: "Bluetoothつながらない" },
 ];
 
 const PURPOSE_SEARCHES = [
-  { label: "通知を消したい", q: "通知を消したい" },
-  { label: "画面を暗くしたい", q: "画面を暗くしたい" },
-  { label: "Wi-Fiが切れる", q: "Wi-Fiが切れる" },
-  { label: "通信量を節約したい", q: "通信量を節約したい" },
+  { label: "通知・音を減らす", note: "うるさい、鳴る、邪魔", q: "通知うるさい" },
+  { label: "見やすくする", note: "明るさ、文字、表示", q: "画面暗くしたい" },
+  { label: "接続トラブル", note: "Wi-Fi、Bluetooth、ネット", q: "WiFi切れる" },
+  { label: "権限を見直す", note: "マイク、カメラ、位置情報", q: "マイク使えない" },
 ];
 
 const FEATURES = [
-  { id: "new-pc-setup", emoji: "💻", title: "新PC初期設定" },
-  { id: "iphone-switch", emoji: "📱", title: "iPhone乗り換え" },
-  { id: "privacy-settings", emoji: "🔒", title: "プライバシー設定" },
-  { id: "display-comfort", emoji: "🖥", title: "目に優しい表示" },
-  { id: "troubleshoot-network", emoji: "📶", title: "ネット接続トラブル" },
-  { id: "notification-control", emoji: "🔔", title: "通知コントロール" },
+  { id: "new-pc-setup", mark: "A", title: "Windows 11初期設定" },
+  { id: "iphone-switch", mark: "B", title: "iPhone乗り換え" },
+  { id: "privacy-settings", mark: "C", title: "権限・プライバシー" },
 ];
 
 export default async function Home() {
   const allSettings = await getAllSettings();
-  const recentSettings = [...allSettings]
-    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-    .slice(0, 5);
+  const counts = Object.fromEntries(PRIMARY_OS_TYPES.map((os) => [os, allSettings.filter((setting) => setting.os === os).length]));
 
   return (
-    <div style={{ padding: "72px 0 60px" }}>
+    <div className="home-page">
       <KeyboardShortcut />
 
-      {/* Hero */}
-      <div style={{ textAlign: "center", marginBottom: 40 }}>
-        <h1 style={{ fontSize: 42, fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 12 }}>
-          設定、どこ？
-        </h1>
-        <p style={{ fontSize: 17, color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: 6 }}>
-          PC・スマホの設定場所がわからないを、最速で解決する
-        </p>
-        <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-          <kbd className="kbd">/</kbd> キーで検索
-        </p>
-      </div>
-
-      {/* Search */}
-      <div style={{ maxWidth: 640, margin: "0 auto 28px" }}>
-        <SearchBox large />
-      </div>
-
-      <div style={{ maxWidth: 640, margin: "0 auto 32px" }}>
-        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 8px" }}>目的から探す</p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-          {PURPOSE_SEARCHES.map((item) => (
-            <Link key={item.q} href={`/search?q=${encodeURIComponent(item.q)}`} className="filter-chip">{item.label}</Link>
-          ))}
+      <section className="home-hero" aria-labelledby="home-title">
+        <div className="home-hero-copy">
+          <h1 id="home-title">設定どこ？</h1>
+          <p className="home-subtitle">Windows 11・iPhone・Android・Macの設定方法を紹介</p>
+          <div className="home-supported home-supported-focus" aria-label="重点対応端末">
+            <strong>重点対応</strong>
+            <span>Windows 11</span>
+            <span>iPhone</span>
+            <span>Android</span>
+            <span>Mac</span>
+          </div>
         </div>
-        <div style={{ textAlign: "center", marginTop: 14 }}>
-          <Link href="/diagnose" style={{ fontSize: 13, color: "var(--primary)", textDecoration: "none", fontWeight: 600 }}>うまくいかない時は、症状から診断する →</Link>
+
+        <div className="home-search-panel" aria-label="設定を検索">
+          <div className="search-panel-kicker"><strong>検索</strong><span>困っていることを、そのまま入力</span></div>
+          <SearchBox large showButton />
+          <p className="search-panel-example">例：通知うるさい・拡張子見たい・マイク使えない</p>
+          <div className="search-panel-foot"><kbd className="kbd">/</kbd><span>キーでいつでも検索欄へ移動</span></div>
         </div>
-      </div>
+      </section>
 
-      {/* Popular searches */}
-      <div style={{ maxWidth: 640, margin: "0 auto 48px" }}>
-        <PopularSearches staticList={STATIC_POPULAR} />
-      </div>
-
-      {/* Recently viewed */}
-      <RecentlyViewed />
-
-      {/* Popular settings ranking */}
-      <PopularSettings />
-
-      {/* Feature collections */}
-      <div style={{ maxWidth: 640, margin: "0 auto 48px" }}>
-        <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
-          特集・まとめ
-        </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-          {FEATURES.map((f) => (
-            <Link key={f.id} href={`/feature/${f.id}`} style={{
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-              padding: "16px 12px", background: "var(--surface)", border: "1px solid var(--border)",
-              borderRadius: "var(--radius)", textDecoration: "none", color: "var(--text)",
-              transition: "border-color 0.15s, box-shadow 0.15s",
-              textAlign: "center",
-            }}>
-              <span style={{ fontSize: 24 }}>{f.emoji}</span>
-              <span style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}>{f.title}</span>
+      <section className="home-section popular-section" aria-labelledby="popular-title">
+        <div className="section-heading-row">
+          <div>
+            <p className="section-index">入口を選ぶ / START HERE</p>
+            <h2 id="popular-title">よくある探し方</h2>
+          </div>
+          <span className="section-aside">言い方はざっくりでOK</span>
+        </div>
+        <div className="quick-link-list">
+          {POPULAR_SEARCHES.map((item, index) => (
+            <Link key={item.q} href={`/search?q=${encodeURIComponent(item.q)}`} className="quick-link">
+              <span className="quick-link-no">{String(index + 1).padStart(2, "0")}</span>
+              <span>{item.label}</span>
+              <span className="quick-link-arrow" aria-hidden="true">↗</span>
             </Link>
           ))}
         </div>
+      </section>
+
+      <section className="home-section" aria-labelledby="diagnose-title">
+        <div className="section-heading-row">
+          <div>
+            <p className="section-index">症状から / BY SYMPTOM</p>
+            <h2 id="diagnose-title">困りごとから探す</h2>
+          </div>
+          <Link href="/diagnose" className="section-link">症状を選ぶ →</Link>
+        </div>
+        <p style={{ margin: 0, color: "var(--text-secondary)", lineHeight: 1.8 }}>「Wi-Fiがつながらない」「通知が届かない」など、症状を選んで解決方法を探せます。</p>
+      </section>
+
+      <div className="home-two-column">
+        <section className="home-section" aria-labelledby="purpose-title">
+          <div className="section-heading-row">
+            <div>
+              <p className="section-index">目的から / BY PURPOSE</p>
+              <h2 id="purpose-title">設定したいことから探す</h2>
+            </div>
+          </div>
+          <div className="purpose-grid">
+            {PURPOSE_SEARCHES.map((item, index) => (
+              <Link key={item.q} href={`/search?q=${encodeURIComponent(item.q)}`} className="purpose-card">
+                <span className="purpose-card-no">0{index + 1}</span>
+                <span className="purpose-card-copy"><strong>{item.label}</strong><small>{item.note}</small></span>
+                <span className="purpose-card-arrow" aria-hidden="true">→</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <aside className="home-route-card" aria-label="使い方">
+          <p className="section-index">最短ルート / HOW IT WORKS</p>
+          <h2>3ステップで到着</h2>
+          <ol>
+            <li><b>01</b><span><strong>言葉で探す</strong><small>「うるさい」「使えない」でも検索</small></span></li>
+            <li><b>02</b><span><strong>端末を選ぶ</strong><small>Windows 11 / iPhone / Android / Mac</small></span></li>
+            <li><b>03</b><span><strong>手順を試す</strong><small>チェックしながら設定を完了</small></span></li>
+          </ol>
+        </aside>
       </div>
 
-      {/* OS cards */}
-      <div style={{ maxWidth: 640, margin: "0 auto 48px" }}>
-        <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
-          OSから探す
-        </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
-          {(["windows11", "ios", "macos", "android"] as const).map((os) => (
-            <Link key={os} href={`/os/${os}`} style={{
-              background: "var(--surface)", border: "1px solid var(--border)",
-              borderRadius: "var(--radius)", padding: "18px 20px",
-              textDecoration: "none", color: "var(--text)", fontWeight: 600, fontSize: 14,
-              transition: "border-color 0.15s, box-shadow 0.15s",
-            }}>
-              {OS_LABELS[os]}
-              <span style={{ display: "block", fontSize: 12, fontWeight: 400, color: "var(--text-muted)", marginTop: 4 }}>
-                設定一覧 →
-              </span>
+      <section className="home-section os-section" aria-labelledby="os-title">
+        <div className="section-heading-row">
+          <div>
+            <p className="section-index">端末から / BY DEVICE</p>
+            <h2 id="os-title">先に端末を選ぶ</h2>
+          </div>
+          <span className="section-aside">現在 {allSettings.length} 件を掲載</span>
+        </div>
+        <div className="os-card-grid">
+          {PRIMARY_OS_TYPES.map((os, index) => (
+            <Link key={os} href={`/os/${os}`} className={`os-card os-card-${index + 1}`}>
+              <span className="os-card-mark">0{index + 1}</span>
+              <span className="os-card-name">{OS_LABELS[os]}</span>
+              <span className="os-card-count">{counts[os] || 0}件のガイド <b aria-hidden="true">→</b></span>
             </Link>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* New arrivals */}
-      <div style={{ maxWidth: 640, margin: "0 auto" }}>
-        <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
-          新着・更新
-        </h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {recentSettings.map((s) => (
-            <Link key={s.id} href={`/setting/${s.slug}?os=${s.os}`} style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "12px 16px", background: "var(--surface)",
-              border: "1px solid var(--border)", borderRadius: 10,
-              textDecoration: "none", color: "var(--text)",
-              transition: "border-color 0.15s",
-            }}>
-              <span style={{ fontSize: 14, flex: 1, fontWeight: 500 }}>{s.title}</span>
-              <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{OS_LABELS[s.os]}</span>
+      <section className="home-section feature-section" aria-labelledby="feature-title">
+        <div className="section-heading-row">
+          <div>
+            <p className="section-index">まとめ / FIELD NOTES</p>
+            <h2 id="feature-title">まとめて片づける</h2>
+          </div>
+          <Link href="/feature/new-pc-setup" className="section-link">特集をすべて見る →</Link>
+        </div>
+        <div className="feature-grid">
+          {FEATURES.map((feature) => (
+            <Link key={feature.id} href={`/feature/${feature.id}`} className="feature-card">
+              <span className="feature-mark" aria-hidden="true">{feature.mark}</span>
+              <span>{feature.title}</span>
+              <span className="feature-arrow" aria-hidden="true">↗</span>
             </Link>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
