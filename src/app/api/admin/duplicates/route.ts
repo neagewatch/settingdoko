@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllSettings } from "@/lib/data";
-import { canonicalSlug, detectDuplicateGroups, isStrongDuplicateGroup } from "@/lib/duplicate-detection";
+import { canonicalSlug, detectDuplicateGroups, isStrongDuplicateGroup, isVariantTitle } from "@/lib/duplicate-detection";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { requireSameOrigin } from "@/lib/request-security";
 import { serverSupabase } from "@/lib/server-supabase";
@@ -33,6 +33,10 @@ function chooseKeeper(items: Setting[]): Setting {
     const leftCanonical = canonicalSlug(left.slug) === left.slug ? 1 : 0;
     const rightCanonical = canonicalSlug(right.slug) === right.slug ? 1 : 0;
     if (leftCanonical !== rightCanonical) return rightCanonical - leftCanonical;
+
+    const leftVariant = isVariantTitle(left.title) ? 1 : 0;
+    const rightVariant = isVariantTitle(right.title) ? 1 : 0;
+    if (leftVariant !== rightVariant) return leftVariant - rightVariant;
 
     const leftPublished = left.status === "published" ? 1 : 0;
     const rightPublished = right.status === "published" ? 1 : 0;

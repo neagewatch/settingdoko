@@ -1,6 +1,6 @@
 import { getStepText, Setting } from "./types";
 
-export type DuplicateReason = "same-slug" | "derived-slug" | "same-title" | "same-content" | "similar-title";
+export type DuplicateReason = "same-slug" | "derived-slug" | "same-title" | "same-content" | "variant-title" | "similar-title";
 
 export interface DuplicateItem {
   id: string;
@@ -20,7 +20,7 @@ export interface DuplicateGroup {
   items: DuplicateItem[];
 }
 
-const STRONG_DUPLICATE_REASONS: DuplicateReason[] = ["same-slug", "derived-slug", "same-title", "same-content"];
+const STRONG_DUPLICATE_REASONS: DuplicateReason[] = ["same-slug", "derived-slug", "same-title", "same-content", "variant-title"];
 
 /**
  * 自動整理してもよい重複グループかを判定する。
@@ -35,6 +35,7 @@ const REASON_LABELS: Record<DuplicateReason, string> = {
   "derived-slug": "基本slugの派生記事です",
   "same-title": "同じOSでタイトルが一致しています",
   "same-content": "設定経路・手順の内容が一致しています",
+  "variant-title": "発生条件だけ違う派生記事です",
   "similar-title": "同じOS・カテゴリでタイトルがよく似ています",
 };
 
@@ -48,6 +49,17 @@ function normalize(value: unknown): string {
 
 function titleKey(title: string): string {
   return normalize(title);
+}
+
+const VARIANT_TITLE_PATTERN = /^(.*?)[（(]([^（）()]+)[）)]$/;
+
+export function getBaseTitle(title: string): string {
+  const trimmed = title.trim();
+  return trimmed.match(VARIANT_TITLE_PATTERN)?.[1]?.trim() || trimmed;
+}
+
+export function isVariantTitle(title: string): boolean {
+  return getBaseTitle(title) !== title.trim();
 }
 
 const CANONICAL_SLUG_ALIASES: Record<string, string> = {
@@ -161,6 +173,7 @@ export function detectDuplicateGroups(settings: Setting[]): DuplicateGroup[] {
   const bySlug = new Map<string, number[]>();
   const byCanonicalSlug = new Map<string, number[]>();
   const byTitle = new Map<string, number[]>();
+  const byVariantBaseTitle = new Map<string, number[]>();
   const byContent = new Map<string, number[]>();
 
   settings.forEach((setting, index) => {
@@ -182,6 +195,12 @@ export function detectDuplicateGroups(settings: Setting[]): DuplicateGroup[] {
       byTitle.set(titleGroup, [...(byTitle.get(titleGroup) || []), index]);
     }
 
+    const baseTitle = getBaseTitle(setting.title);
+    if (baseTitle !== setting.title.trim()) {
+      const variantGroup = `${setting.os}\u0000${setting.category}\u0000${titleKey(baseTitle)}`;
+      byVariantBaseTitle.set(variantGroup, [...(byVariantBaseTitle.get(variantGroup) || []), index]);
+    }
+
     const content = contentKey(setting);
     if (content.length >= 24) {
       const contentGroup = `${setting.os}\u0000${content}`;
@@ -195,6 +214,12 @@ export function detectDuplicateGroups(settings: Setting[]): DuplicateGroup[] {
     if (distinctSlugs.size > 1) addBucket(indexes, "derived-slug", unionFind, pairReasons);
   }
   for (const indexes of byTitle.values()) addBucket(indexes, "same-title", unionFind, pairReasons);
+  for (const [groupKey, variantIndexes] of byVariantBaseTitle.entries()) {
+    const [os, category, baseTitle] = groupKey.split("\u0000");
+    const baseIndexes = (byTitle.get(`${os}\u0000${baseTitle}`) || [])
+      .filter((index) => settings[index].category === category);
+    if (baseIndexes.length > 0) addBucket([...baseIndexes, ...variantIndexes], "variant-title", unionFind, pairReasons);
+  }
   for (const indexes of byContent.values()) addBucket(indexes, "same-content", unionFind, pairReasons);
 
   // 完全一致だけでなく、語尾だけが違う記事なども「要確認」として拾う。
@@ -224,6 +249,9 @@ export function detectDuplicateGroups(settings: Setting[]): DuplicateGroup[] {
 
         const key = pairKey(left.index, right.index);
         const reasons = pairReasons.get(key) || new Set<DuplicateReason>();
+        // 末尾の発生条件だけが違うペアは、派生記事として既に確定しているため
+        // fuzzy判定の「似ているだけ」を重ねない。
+        if (reasons.has("variant-title")) continue;
         reasons.add("similar-title");
         pairReasons.set(key, reasons);
         unionFind.union(left.index, right.index);

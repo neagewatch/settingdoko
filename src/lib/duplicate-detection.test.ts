@@ -35,11 +35,26 @@ test("基本slugと派生slugを重複候補としてまとめる", () => {
   assert.equal(isStrongDuplicateGroup(groups[0]), true);
 });
 
-test("タイトルが似ているだけの候補は自動整理しない", () => {
+test("発生条件だけの派生タイトルは自動整理対象にする", () => {
   const left = setting("wifi-settings");
   const right = {
     ...setting("wifi-troubleshoot"),
     title: "Windows 11にサインインできないときの対処（PIN）",
+    description: "別の確認内容です。",
+    path: ["設定", "アカウント"],
+    steps: ["別の手順を確認する"],
+  };
+  const groups = detectDuplicateGroups([left, right]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].reasons.includes("variant-title"), true);
+  assert.equal(isStrongDuplicateGroup(groups[0]), true);
+});
+
+test("タイトルが似ているだけの候補は自動整理しない", () => {
+  const left = setting("signin-settings");
+  const right = {
+    ...setting("signin-howto"),
+    title: "Windows 11にサインインできないときの対処方法",
     description: "別の確認内容です。",
     path: ["設定", "アカウント"],
     steps: ["別の手順を確認する"],
