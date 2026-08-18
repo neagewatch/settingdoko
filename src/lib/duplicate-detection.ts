@@ -20,6 +20,16 @@ export interface DuplicateGroup {
   items: DuplicateItem[];
 }
 
+const STRONG_DUPLICATE_REASONS: DuplicateReason[] = ["same-slug", "derived-slug", "same-title", "same-content"];
+
+/**
+ * 自動整理してもよい重複グループかを判定する。
+ * タイトルが似ているだけの候補は、別の解決方法である可能性があるため手動確認に残す。
+ */
+export function isStrongDuplicateGroup(group: Pick<DuplicateGroup, "reasons">): boolean {
+  return group.reasons.length > 0 && group.reasons.every((reason) => STRONG_DUPLICATE_REASONS.includes(reason));
+}
+
 const REASON_LABELS: Record<DuplicateReason, string> = {
   "same-slug": "slugが一致しています",
   "derived-slug": "基本slugの派生記事です",
@@ -155,10 +165,16 @@ export function detectDuplicateGroups(settings: Setting[]): DuplicateGroup[] {
 
   settings.forEach((setting, index) => {
     const slug = normalize(setting.slug);
-    if (slug) bySlug.set(slug, [...(bySlug.get(slug) || []), index]);
+    if (slug) {
+      const slugGroup = `${setting.os}\u0000${slug}`;
+      bySlug.set(slugGroup, [...(bySlug.get(slugGroup) || []), index]);
+    }
 
     const canonical = normalize(canonicalSlug(setting.slug));
-    if (canonical) byCanonicalSlug.set(canonical, [...(byCanonicalSlug.get(canonical) || []), index]);
+    if (canonical) {
+      const canonicalGroup = `${setting.os}\u0000${canonical}`;
+      byCanonicalSlug.set(canonicalGroup, [...(byCanonicalSlug.get(canonicalGroup) || []), index]);
+    }
 
     const title = titleKey(setting.title);
     if (title) {
@@ -252,7 +268,7 @@ export function detectDuplicateGroups(settings: Setting[]): DuplicateGroup[] {
       });
     groups.push({
       id: `duplicate-${groups.length + 1}`,
-      confidence: reasons.includes("similar-title") && reasons.length === 1 ? "medium" : "high",
+      confidence: isStrongDuplicateGroup({ reasons }) ? "high" : "medium",
       reasons: reasons as DuplicateReason[],
       reason: reasons.map((reason) => REASON_LABELS[reason]).join(" / "),
       items,

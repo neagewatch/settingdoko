@@ -10,6 +10,9 @@ import type { DuplicateGroup, DuplicateItem } from "@/lib/duplicate-detection";
 type DuplicateResponse = {
   totalArticles: number;
   totalGroups: number;
+  autoMergeGroups: number;
+  autoDeleteItems: number;
+  reviewGroups: number;
   groups: DuplicateGroup[];
 };
 
@@ -23,6 +26,7 @@ export default function DuplicateReviewClient() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [merging, setMerging] = useState(false);
   const [error, setError] = useState("");
 
   const loadDuplicates = useCallback(async (isRefresh = false) => {
@@ -71,7 +75,7 @@ export default function DuplicateReviewClient() {
 
   async function deleteSelected() {
     const ids = [...selectedIds];
-    if (ids.length === 0 || deleting) return;
+    if (ids.length === 0 || deleting || merging) return;
 
     const publishedWarning = selectedPublished.length > 0
       ? `\n\n公開記事が${selectedPublished.length}件含まれています。削除すると公開ページも消えます。`
@@ -96,6 +100,33 @@ export default function DuplicateReviewClient() {
     }
   }
 
+  async function mergeAllStrongDuplicates() {
+    const count = data?.autoDeleteItems ?? 0;
+    if (count === 0 || merging || deleting) return;
+    const confirmed = window.confirm(
+      `一致・高確度の重複を${count}件削除し、各グループ1件に整理します。\n\n公開記事が含まれる場合は、公開中の記事を優先して残します。タイトルが似ているだけの「要確認」候補は変更しません。\n\nこの操作は元に戻せません。続けますか？`,
+    );
+    if (!confirmed) return;
+
+    setMerging(true);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/duplicates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ execute: true }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "重複記事を一括整理できませんでした");
+      window.alert(`${body.mergedGroups ?? 0}グループを整理し、${body.deletedRows ?? 0}件を削除しました。`);
+      await loadDuplicates(true);
+    } catch (reason) {
+      window.alert(reason instanceof Error ? reason.message : "重複記事を一括整理できませんでした");
+    } finally {
+      setMerging(false);
+    }
+  }
+
   const cardStyle = {
     background: "var(--surface)",
     border: "1px solid var(--border)",
@@ -113,18 +144,30 @@ export default function DuplicateReviewClient() {
           <div>
             <h2 style={{ margin: 0, fontSize: 18 }}>重複候補の確認</h2>
             <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 13 }}>
-              全{data?.totalArticles ?? 0}記事を確認し、重複の可能性がある記事だけを表示しています。
+              全{data?.totalArticles ?? 0}記事を確認しています。一致・高確度の重複は自動で1件に整理できます。
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void loadDuplicates(true)}
-            disabled={refreshing || deleting}
-            style={{ marginLeft: "auto", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-secondary)", cursor: refreshing ? "wait" : "pointer", fontSize: 12, fontWeight: 600 }}
-          >{refreshing ? "確認中…" : "↻ 再確認"}</button>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {(data?.autoDeleteItems ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => void mergeAllStrongDuplicates()}
+                disabled={refreshing || deleting || merging}
+                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#B91C1C", cursor: merging ? "wait" : "pointer", fontSize: 12, fontWeight: 700 }}
+              >{merging ? "整理中…" : `重複を一括整理（${data?.autoDeleteItems}件）`}</button>
+            )}
+            <button
+              type="button"
+              onClick={() => void loadDuplicates(true)}
+              disabled={refreshing || deleting || merging}
+              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-secondary)", cursor: refreshing ? "wait" : "pointer", fontSize: 12, fontWeight: 600 }}
+            >{refreshing ? "確認中…" : "↻ 再確認"}</button>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 16, fontSize: 13 }}>
           <span>候補グループ <strong>{data?.totalGroups ?? 0}</strong>件</span>
+          <span style={{ color: "#B91C1C" }}>一括整理対象 {data?.autoDeleteItems ?? 0}件</span>
+          <span style={{ color: "#92400E" }}>要確認 {data?.reviewGroups ?? 0}グループ</span>
           <span style={{ color: "#166534" }}>高確度は「一致」</span>
           <span style={{ color: "#92400E" }}>中確度は「要確認」</span>
         </div>
@@ -138,10 +181,10 @@ export default function DuplicateReviewClient() {
           <button
             type="button"
             onClick={() => void deleteSelected()}
-            disabled={deleting}
+            disabled={deleting || merging}
             style={{ marginLeft: "auto", padding: "8px 14px", borderRadius: 8, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#B91C1C", cursor: deleting ? "wait" : "pointer", fontSize: 12, fontWeight: 700 }}
           >{deleting ? "削除中…" : "🗑 選択した記事を削除"}</button>
-          <button type="button" onClick={() => setSelectedIds(new Set())} disabled={deleting} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 12 }}>選択解除</button>
+          <button type="button" onClick={() => setSelectedIds(new Set())} disabled={deleting || merging} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 12 }}>選択解除</button>
         </div>
       )}
 
@@ -159,7 +202,7 @@ export default function DuplicateReviewClient() {
               <strong style={{ fontSize: 13 }}>候補 {groupIndex + 1}</strong>
               <span style={{ padding: "3px 8px", borderRadius: 999, background: group.confidence === "high" ? "#DCFCE7" : "#FEF3C7", color: group.confidence === "high" ? "#166534" : "#92400E", fontSize: 11, fontWeight: 700 }}>{group.confidence === "high" ? "一致・高確度" : "要確認"}</span>
               <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{group.reason}</span>
-              <button type="button" onClick={() => selectGroup(group)} style={{ marginLeft: "auto", padding: "5px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11 }}>{groupSelected ? "グループの選択解除" : "グループを選択"}</button>
+              <button type="button" onClick={() => selectGroup(group)} disabled={merging} style={{ marginLeft: "auto", padding: "5px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-secondary)", cursor: merging ? "wait" : "pointer", fontSize: 11 }}>{groupSelected ? "グループの選択解除" : "グループを選択"}</button>
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", minWidth: 680, borderCollapse: "collapse", fontSize: 13 }}>

@@ -145,8 +145,12 @@ Vercel環境変数に追加:
 
 ### 重複記事の整理
 
-基本記事を残して派生slugの記事を削除する場合は、対象を確認してから
-`supabase-deduplicate-signin.sql` をSQL Editorで実行します。
+SQLを直接実行せず、管理画面の「重複チェック」を開き、
+「重複を一括整理」を押します。一致・高確度の重複だけを各グループ1件にまとめ、
+タイトルが似ているだけの候補は要確認として残します。
+
+Supabase SQL Editorで整理する必要がある場合のみ、対象テーマ専用の
+`supabase-deduplicate-signin.sql` を使用します。
 
 ---
 

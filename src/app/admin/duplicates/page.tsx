@@ -19,7 +19,7 @@ export default async function DuplicateReviewPage() {
         <div>
           <Link href="/admin" style={{ color: "var(--primary)", fontSize: 12, textDecoration: "none" }}>← 管理画面へ戻る</Link>
           <h1 style={{ margin: "10px 0 0", fontSize: 24 }}>重複候補の確認</h1>
-          <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 13 }}>「重複では？」と思われる記事を確認し、必要なものだけ削除できます。</p>
+          <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 13 }}>全記事の重複を確認し、一致する記事は各グループ1件に整理できます。</p>
         </div>
         <AdminLogoutButton />
       </div>
