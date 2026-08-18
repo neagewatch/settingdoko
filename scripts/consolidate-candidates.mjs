@@ -10,6 +10,20 @@ const CONSOLIDATABLE_PREFIXES = [
   "trouble12-high-demand-",
 ];
 
+// 同じテーマの古いslugを、基本記事へ寄せるための明示的な対応表。
+// 派生記事を残したまま再取り込みされないよう、候補統合と監査で共通利用する。
+const CANONICAL_SLUG_ALIASES = new Map([
+  ["trouble6-win11-signin-failed", "trouble6-win11-signin"],
+  ["trouble8-win11-signin-failed", "trouble6-win11-signin"],
+  ["trouble9-win11-signin", "trouble6-win11-signin"],
+]);
+
+function isWindowsSigninVariant(slug) {
+  return slug.startsWith("trouble6-win11-signin-")
+    || slug.startsWith("trouble8-win11-signin-failed-")
+    || slug.startsWith("trouble9-win11-signin-");
+}
+
 function unique(values) {
   return [...new Set(values.filter((value) => typeof value === "string" && value.trim()))];
 }
@@ -26,8 +40,15 @@ function baseTitle(item) {
     : "";
 }
 
+function getCanonicalSlug(slug) {
+  return CANONICAL_SLUG_ALIASES.get(slug)
+    || (isWindowsSigninVariant(slug) ? "trouble6-win11-signin" : slug);
+}
+
 function getConsolidationKey(item) {
   if (!item || typeof item.slug !== "string") return null;
+  const canonicalSlug = getCanonicalSlug(item.slug);
+  if (canonicalSlug !== item.slug) return canonicalSlug;
   const prefix = CONSOLIDATABLE_PREFIXES.find((value) => item.slug.startsWith(value));
   if (!prefix) return null;
   const label = variantLabel(item);
@@ -136,10 +157,13 @@ function mergeConsolidationGroup(items) {
 }
 
 export {
+  CANONICAL_SLUG_ALIASES,
   CONSOLIDATABLE_PREFIXES,
   consolidateCandidates,
+  getCanonicalSlug,
   getConsolidationGroups,
   getConsolidationKey,
   getConsolidationReport,
+  isWindowsSigninVariant,
   mergeConsolidationGroup,
 };

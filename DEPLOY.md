@@ -143,6 +143,11 @@ Vercel環境変数に追加:
 ### SQLで一括追加
 `supabase-seed.sql` と同じ形式でINSERTを追記して実行
 
+### 重複記事の整理
+
+基本記事を残して派生slugの記事を削除する場合は、対象を確認してから
+`supabase-deduplicate-signin.sql` をSQL Editorで実行します。
+
 ---
 
 ## トラブルシュート

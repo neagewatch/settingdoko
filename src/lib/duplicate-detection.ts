@@ -1,6 +1,6 @@
 import { getStepText, Setting } from "./types";
 
-export type DuplicateReason = "same-slug" | "same-title" | "same-content" | "similar-title";
+export type DuplicateReason = "same-slug" | "derived-slug" | "same-title" | "same-content" | "similar-title";
 
 export interface DuplicateItem {
   id: string;
@@ -22,6 +22,7 @@ export interface DuplicateGroup {
 
 const REASON_LABELS: Record<DuplicateReason, string> = {
   "same-slug": "slugが一致しています",
+  "derived-slug": "基本slugの派生記事です",
   "same-title": "同じOSでタイトルが一致しています",
   "same-content": "設定経路・手順の内容が一致しています",
   "similar-title": "同じOS・カテゴリでタイトルがよく似ています",
@@ -37,6 +38,23 @@ function normalize(value: unknown): string {
 
 function titleKey(title: string): string {
   return normalize(title);
+}
+
+const CANONICAL_SLUG_ALIASES: Record<string, string> = {
+  // normalize()でslugの区切り記号を除去するため、キーも正規化済みにする。
+  trouble6win11signinfailed: "trouble6-win11-signin",
+  trouble8win11signinfailed: "trouble6-win11-signin",
+  trouble9win11signin: "trouble6-win11-signin",
+};
+
+export function canonicalSlug(slug: string): string {
+  const normalized = normalize(slug);
+  return CANONICAL_SLUG_ALIASES[normalized]
+    || (normalized.startsWith("trouble6win11signin")
+      || normalized.startsWith("trouble8win11signinfailed")
+      || normalized.startsWith("trouble9win11signin")
+      ? "trouble6-win11-signin"
+      : normalized);
 }
 
 function contentKey(setting: Setting): string {
@@ -131,12 +149,16 @@ export function detectDuplicateGroups(settings: Setting[]): DuplicateGroup[] {
   const unionFind = new UnionFind(settings.length);
   const pairReasons = new Map<string, Set<DuplicateReason>>();
   const bySlug = new Map<string, number[]>();
+  const byCanonicalSlug = new Map<string, number[]>();
   const byTitle = new Map<string, number[]>();
   const byContent = new Map<string, number[]>();
 
   settings.forEach((setting, index) => {
     const slug = normalize(setting.slug);
     if (slug) bySlug.set(slug, [...(bySlug.get(slug) || []), index]);
+
+    const canonical = normalize(canonicalSlug(setting.slug));
+    if (canonical) byCanonicalSlug.set(canonical, [...(byCanonicalSlug.get(canonical) || []), index]);
 
     const title = titleKey(setting.title);
     if (title) {
@@ -152,6 +174,10 @@ export function detectDuplicateGroups(settings: Setting[]): DuplicateGroup[] {
   });
 
   for (const indexes of bySlug.values()) addBucket(indexes, "same-slug", unionFind, pairReasons);
+  for (const indexes of byCanonicalSlug.values()) {
+    const distinctSlugs = new Set(indexes.map((index) => normalize(settings[index].slug)));
+    if (distinctSlugs.size > 1) addBucket(indexes, "derived-slug", unionFind, pairReasons);
+  }
   for (const indexes of byTitle.values()) addBucket(indexes, "same-title", unionFind, pairReasons);
   for (const indexes of byContent.values()) addBucket(indexes, "same-content", unionFind, pairReasons);
 
