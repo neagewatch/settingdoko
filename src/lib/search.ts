@@ -5,8 +5,8 @@ import { hasBoilerplateContent } from "./content-quality";
 const PURPOSE_TERMS: Array<{ matches: RegExp; terms: string[] }> = [
   { matches: /バッテリ|電池|長持ち|充電.*(節約|抑え)/i, terms: ["バッテリー", "電池", "省電力", "充電"] },
   { matches: /通知.*(消|止|オフ|うるさ)|通知を/i, terms: ["通知", "集中モード"] },
-  { matches: /(画面|ディスプレイ).*(暗|明る)|明るさ/i, terms: ["明るさ", "暗い", "ディスプレイ"] },
-  { matches: /(暗い|暗く|まぶしい)/i, terms: ["画面", "明るさ", "ディスプレイ"] },
+  { matches: /(画面|ディスプレイ).*(暗|明る)|明るさ/i, terms: ["明るさ", "暗い", "暗く", "ディスプレイ"] },
+  { matches: /(暗い|暗く|まぶしい)/i, terms: ["画面", "明るさ", "暗い", "暗く", "ディスプレイ"] },
   { matches: /(文字|字|フォント).*(大き|小さ|見づら|読みにく)/i, terms: ["文字サイズ", "フォントサイズ", "表示サイズ", "アクセシビリティ"] },
   { matches: /充電.*80|80.*充電/i, terms: ["充電", "バッテリー", "上限"] },
   { matches: /(wi-?fi|wifi|ワイファイ).*(切|繋|つなが|不安定)|ネット.*切/i, terms: ["Wi-Fi", "ネットワーク"] },
