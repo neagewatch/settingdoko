@@ -94,6 +94,7 @@ export function searchSettings(
   const q = normalized.toLowerCase().trim();
   const detectedOS = osFilter || inferredOS(q);
   if (!q) return detectedOS ? settings.filter((s) => s.os === detectedOS) : settings;
+  const troubleshootingQuery = /(できない|つながらない|繋がらない|エラー|失敗|動かない|出ない|使えない|遅い|消えた|困る|不具合)/i.test(q);
 
   const tokens = buildTerms(q);
   if (!tokens.length && detectedOS) return settings.filter((s) => s.os === detectedOS);
@@ -129,6 +130,9 @@ export function searchSettings(
       // 自動生成の発生場面テンプレートは検索可能なままにするが、
       // 具体的な設定記事より先に出て初心者を迷わせないよう減点する。
       if (hasBoilerplateContent(s)) score -= 18;
+      // 「画面暗い」「写真消したい」は設定・操作の目的語であり、
+      // トラブル記事を先頭に出すと解決したい操作へ遠回りになる。
+      if (s.category === "troubleshoot") score += troubleshootingQuery ? 4 : -35;
       if (s.verified_at) score += 2;
       score += matched * 3;
       return { setting: s, score, matched };
