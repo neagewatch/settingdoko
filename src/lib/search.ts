@@ -1,10 +1,12 @@
-import { getStepText, Setting, OSType, ALIAS_MAP } from "./types";
+import { getStepText, Setting, OSType, ALIAS_MAP, PLATFORM_TYPES } from "./types";
 
 /** 設定名を知らない人の「目的」を、検索に使える言葉へ展開する。 */
 const PURPOSE_TERMS: Array<{ matches: RegExp; terms: string[] }> = [
   { matches: /バッテリ|電池|長持ち|充電.*(節約|抑え)/i, terms: ["バッテリー", "電池", "省電力", "充電"] },
   { matches: /通知.*(消|止|オフ|うるさ)|通知を/i, terms: ["通知", "集中モード"] },
   { matches: /(画面|ディスプレイ).*(暗|明る)|明るさ/i, terms: ["明るさ", "暗い", "ディスプレイ"] },
+  { matches: /(暗い|暗く|まぶしい)/i, terms: ["画面", "明るさ", "ディスプレイ"] },
+  { matches: /(文字|字|フォント).*(大き|小さ|見づら|読みにく)/i, terms: ["文字サイズ", "フォントサイズ", "表示サイズ", "アクセシビリティ"] },
   { matches: /充電.*80|80.*充電/i, terms: ["充電", "バッテリー", "上限"] },
   { matches: /(wi-?fi|wifi|ワイファイ).*(切|繋|つなが|不安定)|ネット.*切/i, terms: ["Wi-Fi", "ネットワーク"] },
   { matches: /通信量|ギガ|データ.*(節約|減)|モバイル.*データ/i, terms: ["通信量", "モバイルデータ", "データ通信"] },
@@ -12,6 +14,9 @@ const PURPOSE_TERMS: Array<{ matches: RegExp; terms: string[] }> = [
   { matches: /マイク|音声|声.*(使え|出な)|会議.*音/i, terms: ["マイク", "音声", "許可", "権限"] },
   { matches: /bluetooth|ブルートゥース|イヤホン|ペアリング/i, terms: ["Bluetooth", "接続", "ペアリング", "イヤホン"] },
   { matches: /カメラ|写真.*撮れ|ビデオ.*使え/i, terms: ["カメラ", "許可", "権限", "プライバシー"] },
+  { matches: /(写真|画像|ビデオ).*(消した|消す|削除|捨て)/i, terms: ["写真", "削除", "最近削除した項目", "容量"] },
+  { matches: /(音|サウンド|スピーカー).*(出ない|出な|聞こえ|鳴らない)/i, terms: ["音", "サウンド", "スピーカー", "出力"] },
+  { matches: /(word|ワード).*(余白|マージン)|余白.*(word|ワード)/i, terms: ["Word", "余白", "レイアウト", "ページ設定"] },
 ];
 
 const INTENT_TERMS = [
@@ -27,7 +32,8 @@ const OS_TERMS: Array<{ os: OSType; terms: string[] }> = [
   { os: "macos", terms: ["mac", "macos", "macbook"] },
 ];
 
-const OS_SORT_ORDER: OSType[] = ["windows11", "ios", "android", "macos", "windows10"];
+const OS_SORT_ORDER: readonly OSType[] = PLATFORM_TYPES;
+const ERROR_CODE_PATTERN = /(?:0x[0-9a-f]{4,}|\b\d{3,5}(?:-\d{3,5})?\b)/i;
 
 function expandPurposeTerms(query: string): string[] {
   return PURPOSE_TERMS
@@ -118,6 +124,7 @@ export function searchSettings(
       if (q.length >= 2 && title === q) score += 60;
       if (title.includes(q)) score += 25;
       if (aliases.some((alias) => alias === q)) score += 30;
+      if (ERROR_CODE_PATTERN.test(q) && (title.includes(q) || aliases.some((alias) => alias.includes(q)))) score += 80;
       score += matched * 3;
       return { setting: s, score, matched };
     })

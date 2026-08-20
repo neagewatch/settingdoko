@@ -31,8 +31,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const label = CATEGORIES[cat];
   if (!label) return { title: "カテゴリ" };
   return {
-    title: `${label}の設定一覧`,
-    description: `Windows 11・iPhone・Android・Macの${label}に関する設定場所と最短手順を探せます。`,
+    title: `${label}の設定・トラブル解決一覧`,
+    description: `Windows 11・iPhone・Android・Mac・各種アプリの${label}に関する設定方法と解決手順を探せます。`,
     alternates: { canonical: `/category/${cat}` },
   };
 }

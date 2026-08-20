@@ -13,7 +13,49 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpful_count INTEGER NOT NULL DEF
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS screenshot_url TEXT;
 CREATE INDEX IF NOT EXISTS idx_settings_slug ON settings(slug);
 CREATE INDEX IF NOT EXISTS idx_settings_os ON settings(os);
+-- 旧環境のslug単独UNIQUEは、同一テーマのOS別記事を妨げるため解除する。
+ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_slug_key;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_settings_unique_slug_os ON settings(slug, os);
+
+-- アプリ・ブラウザの記事も保存できるよう、旧OS制約を置き換える。
+ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_os_check;
+DO $$
+DECLARE constraint_name TEXT;
+BEGIN
+  SELECT c.conname INTO constraint_name
+  FROM pg_constraint c
+  JOIN pg_class t ON t.oid = c.conrelid
+  JOIN pg_namespace n ON n.oid = t.relnamespace
+  WHERE n.nspname = 'public' AND t.relname = 'settings' AND c.contype = 'c'
+    AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = t.oid AND attname = 'os')]::smallint[]
+  LIMIT 1;
+  IF constraint_name IS NOT NULL THEN EXECUTE format('ALTER TABLE settings DROP CONSTRAINT %I', constraint_name); END IF;
+END $$;
+ALTER TABLE settings ADD CONSTRAINT settings_os_check CHECK (os IN (
+  'windows11','ios','macos','android','windows10','word','excel','powerpoint','outlook','teams',
+  'chrome','edge','firefox','safari','line','gmail','youtube','google_calendar','google_drive',
+  'zoom','slack','ipados','power_automate','acrobat'
+));
+
+-- 検索ログも同じプラットフォーム一覧を受け付ける。
+CREATE TABLE IF NOT EXISTS search_logs (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  query TEXT NOT NULL CHECK (char_length(query) BETWEEN 1 AND 120),
+  normalized_query TEXT NOT NULL CHECK (char_length(normalized_query) BETWEEN 1 AND 120),
+  os TEXT,
+  result_count INTEGER NOT NULL DEFAULT 0 CHECK (result_count BETWEEN 0 AND 50),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE search_logs DROP CONSTRAINT IF EXISTS search_logs_os_check;
+ALTER TABLE search_logs ADD CONSTRAINT search_logs_os_check CHECK (os IS NULL OR os IN (
+  'windows11','ios','macos','android','windows10','word','excel','powerpoint','outlook','teams',
+  'chrome','edge','firefox','safari','line','gmail','youtube','google_calendar','google_drive',
+  'zoom','slack','ipados','power_automate','acrobat'
+));
+CREATE INDEX IF NOT EXISTS idx_search_logs_created_at ON search_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_search_logs_zero_hit ON search_logs(result_count, normalized_query);
+ALTER TABLE search_logs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON search_logs FROM anon, authenticated;
 
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'published'
   CHECK (status IN ('draft', 'published'));
@@ -97,7 +139,7 @@ REVOKE INSERT, UPDATE, DELETE ON settings FROM anon, authenticated;
 GRANT USAGE ON SCHEMA public TO service_role;
 GRANT SELECT ON settings TO anon, authenticated;
 GRANT USAGE ON SCHEMA public TO service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.settings, public.content_requests, public.content_reports, public.setting_revisions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.settings, public.content_requests, public.content_reports, public.setting_revisions, public.search_logs TO service_role;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO service_role;
 
 -- 設定ページ・手順ごとの画像保存先（既存データは変更しない）

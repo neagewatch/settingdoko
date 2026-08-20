@@ -35,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/os/ios" style={{ color: "var(--text-muted)", textDecoration: "none" }}>iPhone / iOS</Link>
             <Link href="/os/android" style={{ color: "var(--text-muted)", textDecoration: "none" }}>Android</Link>
             <Link href="/os/macos" style={{ color: "var(--text-muted)", textDecoration: "none" }}>macOS</Link>
+            <Link href="/apps" style={{ color: "var(--text-muted)", textDecoration: "none" }}>アプリ・ブラウザ</Link>
             <Link href="/bookmarks" style={{ color: "var(--text-muted)", textDecoration: "none" }}>ブックマーク</Link>
             <Link href="/diagnose" style={{ color: "var(--text-muted)", textDecoration: "none" }}>症状から探す</Link>
             <Link href="/feature/new-pc-setup" style={{ color: "var(--text-muted)", textDecoration: "none" }}>特集</Link>

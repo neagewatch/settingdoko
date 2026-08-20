@@ -42,7 +42,7 @@ export function DarkModeToggle() {
   if (!mounted) return <div style={{ width: 36, height: 36 }} />;
 
   return (
-    <button className="dark-toggle" onClick={toggle} title={dark ? "ライトモード" : "ダークモード"}>
+    <button type="button" className="dark-toggle" onClick={toggle} title={dark ? "ライトモード" : "ダークモード"} aria-label={dark ? "ライトモードに切り替える" : "ダークモードに切り替える"} aria-pressed={dark}>
       {dark ? "明" : "暗"}
     </button>
   );

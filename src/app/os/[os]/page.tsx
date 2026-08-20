@@ -2,7 +2,7 @@ import { getOSCategoryCounts, getSettingsByOSPage } from "@/lib/data";
 
 export const revalidate = 60;
 
-import { CATEGORIES, OSType, OS_LABELS, PRIMARY_OS_TYPES } from "@/lib/types";
+import { CATEGORIES, OSType, OS_LABELS, PRIMARY_OS_TYPES, isAppPlatform } from "@/lib/types";
 import SearchBox from "@/components/SearchBox";
 import SettingCard from "@/components/SettingCard";
 import Link from "next/link";
@@ -46,6 +46,7 @@ export default async function OSPage({ params, searchParams }: Props) {
   const osType = os as OSType;
 
   if (!OS_LABELS[osType]) notFound();
+  const appPlatform = isAppPlatform(osType);
 
   const selectedCategory = rawCategory && CATEGORIES[rawCategory] ? rawCategory : undefined;
   const requestedPage = parsePage(rawPage);
@@ -83,22 +84,24 @@ export default async function OSPage({ params, searchParams }: Props) {
       </div>
 
       <div className="listing-heading os-page-heading">
-        <p className="section-index">OS / {OS_LABELS[osType]}</p>
-        <h1>{OS_LABELS[osType]}の設定</h1>
-        <p>{pageResult.total}件の設定ガイドを、小ジャンルとページに分けて表示しています。</p>
+        <p className="section-index">{appPlatform ? "APP" : "OS"} / {OS_LABELS[osType]}</p>
+        <h1>{OS_LABELS[osType]}の設定・トラブル解決</h1>
+        <p>{pageResult.total}件のガイドを、小ジャンルとページに分けて表示しています。</p>
       </div>
 
       <section className="os-page-search" aria-labelledby="os-search-heading">
         <div className="os-page-search-heading">
-          <span className="section-index">SEARCH / このOSから探す</span>
+          <span className="section-index">SEARCH / この{appPlatform ? "アプリ" : "OS"}から探す</span>
           <h2 id="os-search-heading">困っていることをそのまま検索</h2>
         </div>
         <SearchBox large showButton os={osType} />
         <p className="os-page-search-note">例：通知うるさい、拡張子を見たい、Wi-Fiがつながらない</p>
       </section>
 
-      <nav className="os-switcher" aria-label="OSを切り替える">
-        {PRIMARY_OS_TYPES.map((targetOS) => (
+      <nav className="os-switcher" aria-label={appPlatform ? "アプリ一覧へ移動" : "OSを切り替える"}>
+        {appPlatform ? (
+          <Link href="/apps" className="os-tab">← アプリ一覧</Link>
+        ) : PRIMARY_OS_TYPES.map((targetOS) => (
           <Link key={targetOS} href={`/os/${targetOS}`} className={`os-tab ${targetOS === osType ? "active" : ""}`} aria-current={targetOS === osType ? "page" : undefined}>
             {OS_LABELS[targetOS]}
           </Link>

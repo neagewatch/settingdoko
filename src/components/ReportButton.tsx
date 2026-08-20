@@ -9,16 +9,23 @@ export default function ReportButton({ settingId, title }: { settingId: string; 
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const startedAt = useRef<number | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { startedAt.current = Date.now(); }, []);
 
   useEffect(() => {
     if (!open) return;
+    textareaRef.current?.focus();
+    const trigger = triggerRef.current;
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
     document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      trigger?.focus();
+    };
   }, [open]);
 
   async function handleSubmit() {
@@ -44,6 +51,7 @@ export default function ReportButton({ settingId, title }: { settingId: string; 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
@@ -51,7 +59,7 @@ export default function ReportButton({ settingId, title }: { settingId: string; 
         style={{
           fontSize: 12, color: "var(--text-muted)", background: "none",
           border: "none", cursor: "pointer", textDecoration: "underline",
-          padding: 0,
+          padding: "10px 4px",
         }}
       >
         🚩 情報が古い・間違いを報告
@@ -68,6 +76,7 @@ export default function ReportButton({ settingId, title }: { settingId: string; 
               氏名・メールアドレスは不要です。パスワードや個人情報は入力しないでください。
             </p>
             <textarea
+              ref={textareaRef}
               value={comment}
               aria-label="修正内容"
               onChange={(e) => setComment(e.target.value)}

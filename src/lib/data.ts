@@ -18,8 +18,10 @@ export interface ContentReport { id: string; setting_id: string; title: string; 
 export interface ServerZeroHitSearch { query: string; os: string | null; count: number; last_seen_at: string; }
 export interface SettingPageResult { items: Setting[]; total: number; }
 export type OSCategoryCounts = Record<string, number>;
+export interface PublishedStats { total: number; byPlatform: Record<string, number>; }
 
 const PUBLIC_COLUMNS = "id,title,slug,os,version,category,aliases,path,steps,related_slugs,keywords,description,updated_at,view_count,helpful_count,difficulty,estimate_minutes,screenshot_url,status,published_at,verified_at,source_url,device_scope,impact,rollback,caution,review_due_at";
+const SEARCH_COLUMNS = "id,title,slug,os,version,category,aliases,path,keywords,description,updated_at,status,verified_at";
 const ADMIN_COLUMNS = `${PUBLIC_COLUMNS},editor_note`;
 const FALLBACK_UPDATED_AT = "2026-08-01T00:00:00.000Z";
 
@@ -33,6 +35,9 @@ const SETTINGS_PAGE_SIZE = 500;
 const SETTINGS_MAX_PAGES = 200;
 let publicSettingsCache: { data: Setting[]; expiresAt: number } | null = null;
 let publicSettingsRequest: Promise<Setting[]> | null = null;
+let publicSearchCache: { data: Setting[]; expiresAt: number } | null = null;
+let publicSearchRequest: Promise<Setting[]> | null = null;
+let publishedStatsCache: { data: PublishedStats; expiresAt: number } | null = null;
 const categoryPageCache = new Map<string, { data: SettingPageResult; expiresAt: number }>();
 const osCategoryCountsCache = new Map<string, { data: OSCategoryCounts; expiresAt: number }>();
 
@@ -171,10 +176,78 @@ async function loadPublishedSettings(): Promise<Setting[]> {
   }
 }
 
+async function loadPublishedSearchSettings(): Promise<Setting[]> {
+  if (publicSearchCache && publicSearchCache.expiresAt > Date.now()) return publicSearchCache.data;
+  if (publicSearchRequest) return publicSearchRequest;
+
+  const request = (async () => {
+    if (USE_SUPABASE) {
+      try {
+        const result = await fetchSettingsPages(supabase!, SEARCH_COLUMNS, "published");
+        publicSearchCache = { data: result, expiresAt: Date.now() + PUBLIC_CACHE_TTL_MS };
+        return result;
+      } catch (error) {
+        logReadFailure("search", error);
+      }
+    }
+    const result = fallbackSettings().map((setting) => ({ ...setting, steps: [], related_slugs: [] }));
+    publicSearchCache = { data: result, expiresAt: Date.now() + FALLBACK_CACHE_TTL_MS };
+    return result;
+  })();
+
+  publicSearchRequest = request;
+  try {
+    return await request;
+  } finally {
+    if (publicSearchRequest === request) publicSearchRequest = null;
+  }
+}
+
 export function clearPublicSettingsCache() {
   publicSettingsCache = null;
+  publicSearchCache = null;
+  publishedStatsCache = null;
   categoryPageCache.clear();
   osCategoryCountsCache.clear();
+}
+
+export async function getPublishedStats(): Promise<PublishedStats> {
+  if (publishedStatsCache && publishedStatsCache.expiresAt > Date.now()) return publishedStatsCache.data;
+
+  if (USE_SUPABASE) {
+    try {
+      const byPlatform: Record<string, number> = {};
+      let total = 0;
+      for (let page = 0; page < SETTINGS_MAX_PAGES; page += 1) {
+        const { data, error } = await supabase!
+          .from("settings")
+          .select("os")
+          .eq("status", "published")
+          .order("id", { ascending: true })
+          .range(page * SETTINGS_PAGE_SIZE, (page + 1) * SETTINGS_PAGE_SIZE - 1);
+        if (error) throw error;
+        const rows = data || [];
+        total += rows.length;
+        for (const row of rows as Array<{ os?: unknown }>) {
+          if (typeof row.os !== "string" || !row.os) continue;
+          byPlatform[row.os] = (byPlatform[row.os] || 0) + 1;
+        }
+        if (rows.length < SETTINGS_PAGE_SIZE) break;
+      }
+      const result = { total, byPlatform };
+      publishedStatsCache = { data: result, expiresAt: Date.now() + PUBLIC_CACHE_TTL_MS };
+      return result;
+    } catch (error) {
+      logReadFailure("stats", error);
+    }
+  }
+
+  const fallback = fallbackSettings();
+  const byPlatform: Record<string, number> = {};
+  for (const setting of fallback) byPlatform[setting.os] = (byPlatform[setting.os] || 0) + 1;
+  const result = { total: fallback.length, byPlatform };
+  publishedStatsCache = { data: result, expiresAt: Date.now() + FALLBACK_CACHE_TTL_MS };
+  return result;
 }
 
 export async function getAllSettings(includeDrafts = false): Promise<Setting[]> {
@@ -351,7 +424,7 @@ export async function getSettingsByCategory(
 
 export async function searchDB(query: string, os?: OSType): Promise<Setting[]> {
   const safeOS = os && isOSType(os) ? os : undefined;
-  return searchSettings(await loadPublishedSettings(), query, safeOS);
+  return searchSettings(await loadPublishedSearchSettings(), query, safeOS);
 }
 
 export async function getRelatedSettings(relatedSlugs: string[], currentId: string): Promise<Setting[]> {

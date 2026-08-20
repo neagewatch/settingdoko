@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS settings (
   id            UUID        DEFAULT uuid_generate_v4() PRIMARY KEY,
   title         TEXT        NOT NULL,
   slug          TEXT        NOT NULL,
-  os            TEXT        NOT NULL CHECK (os IN ('windows11','ios','macos','android','windows10')),
+  os            TEXT        NOT NULL CHECK (os IN ('windows11','ios','macos','android','windows10','word','excel','powerpoint','outlook','teams','chrome','edge','firefox','safari','line','gmail','youtube','google_calendar','google_drive','zoom','slack','ipados','power_automate','acrobat')),
   version       TEXT        NOT NULL DEFAULT '',
   category      TEXT        NOT NULL,
   aliases       TEXT[]      DEFAULT '{}',
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS search_logs (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   query TEXT NOT NULL CHECK (char_length(query) BETWEEN 1 AND 120),
   normalized_query TEXT NOT NULL CHECK (char_length(normalized_query) BETWEEN 1 AND 120),
-  os TEXT CHECK (os IS NULL OR os IN ('windows11','ios','macos','android','windows10')),
+  os TEXT CHECK (os IS NULL OR os IN ('windows11','ios','macos','android','windows10','word','excel','powerpoint','outlook','teams','chrome','edge','firefox','safari','line','gmail','youtube','google_calendar','google_drive','zoom','slack','ipados','power_automate','acrobat')),
   result_count INTEGER NOT NULL DEFAULT 0 CHECK (result_count BETWEEN 0 AND 50),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

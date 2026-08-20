@@ -21,6 +21,7 @@ import { troubleshootingUniqueSettings } from "./troubleshooting-unique-data.mjs
 import { consolidateCandidates, getConsolidationReport } from "./consolidate-candidates.mjs";
 import { wave3Settings } from "./official-settings-wave3-data.mjs";
 import { wave4Settings } from "./official-settings-wave4-data.mjs";
+import { prelaunchCuratedSettings } from "./prelaunch-curated-data.mjs";
 
 const errors: string[] = [];
 const warnings: string[] = [];
@@ -48,6 +49,7 @@ const rawSettings = [
   ...troubleshootingUniqueSettings,
   ...wave3Settings,
   ...wave4Settings,
+  ...prelaunchCuratedSettings,
 ];
 const consolidatedSettings = consolidateCandidates(rawSettings);
 const consolidationReport = getConsolidationReport(rawSettings);

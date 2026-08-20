@@ -1,11 +1,13 @@
 import { MetadataRoute } from "next";
 import { getAllSettings } from "@/lib/data";
 import { CATEGORIES, PRIMARY_OS_TYPES } from "@/lib/types";
+import { isSettingIndexable } from "@/lib/content-quality";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const settings = (await getAllSettings()).filter((setting) => setting.status !== "draft");
+  const publishedSettings = (await getAllSettings()).filter((setting) => setting.status !== "draft");
+  const settings = publishedSettings.filter((setting) => isSettingIndexable(setting));
 
   // 設定詳細ページ（slug×OS）
   const settingUrls = settings.map((s) => ({
@@ -36,12 +38,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "display-comfort","troubleshoot-network","notification-control",
   ].map((id) => ({
     url: `${BASE_URL}/feature/${id}`,
-    lastModified: latestDate(settings),
+    lastModified: latestDate(publishedSettings),
     changeFrequency: "monthly" as const,
     priority: 0.6,
   }));
 
-  const informationUrls = ["editorial-policy", "privacy", "terms", "contact", "advertising"].map((path) => ({
+  const informationUrls = ["apps", "editorial-policy", "privacy", "terms", "contact", "advertising"].map((path) => ({
     url: `${BASE_URL}/${path}`,
     lastModified: latestDate(settings),
     changeFrequency: "yearly" as const,
@@ -49,8 +51,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   return [
-    { url: BASE_URL, lastModified: latestDate(settings), changeFrequency: "daily", priority: 1.0 },
-    { url: `${BASE_URL}/diagnose`, lastModified: latestDate(settings), changeFrequency: "weekly", priority: 0.8 },
+    { url: BASE_URL, lastModified: latestDate(publishedSettings), changeFrequency: "daily", priority: 1.0 },
+    { url: `${BASE_URL}/diagnose`, lastModified: latestDate(publishedSettings), changeFrequency: "weekly", priority: 0.8 },
     ...osUrls,
     ...categoryUrls,
     ...featureUrls,

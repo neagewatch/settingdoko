@@ -2,7 +2,7 @@ import SearchBox from "@/components/SearchBox";
 import { KeyboardShortcut } from "@/components/Utilities";
 import Link from "next/link";
 import { OS_LABELS, PRIMARY_OS_TYPES } from "@/lib/types";
-import { getAllSettings } from "@/lib/data";
+import { getPublishedStats } from "@/lib/data";
 import type { Metadata } from "next";
 
 export const revalidate = 60;
@@ -35,8 +35,8 @@ const FEATURES = [
 ];
 
 export default async function Home() {
-  const allSettings = await getAllSettings();
-  const counts = Object.fromEntries(PRIMARY_OS_TYPES.map((os) => [os, allSettings.filter((setting) => setting.os === os).length]));
+  const stats = await getPublishedStats();
+  const counts = Object.fromEntries(PRIMARY_OS_TYPES.map((os) => [os, stats.byPlatform[os] || 0]));
 
   return (
     <div className="home-page">
@@ -129,7 +129,7 @@ export default async function Home() {
             <p className="section-index">端末から / BY DEVICE</p>
             <h2 id="os-title">先に端末を選ぶ</h2>
           </div>
-          <span className="section-aside">現在 {allSettings.length} 件を掲載</span>
+          <span className="section-aside">現在 {stats.total} 件を掲載</span>
         </div>
         <div className="os-card-grid">
           {PRIMARY_OS_TYPES.map((os, index) => (

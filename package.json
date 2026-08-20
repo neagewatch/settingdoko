@@ -9,12 +9,15 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx",
-    "audit:data": "tsx scripts/audit-data.ts"
+    "audit:data": "tsx scripts/audit-data.ts",
+    "audit:site": "node scripts/audit-site.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
+    "@types/qrcode": "^1.5.6",
     "@vercel/og": "^1.0.0",
     "next": "16.3.0",
+    "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },

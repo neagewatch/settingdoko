@@ -32,3 +32,17 @@ test("よくあるBluetoothのタイポを補正する", () => {
   const result = searchSettings(settings, "bluetooh");
   assert.equal(result[0]?.category, "bluetooth");
 });
+
+test("端末名を含む口語の明るさ検索を拾う", () => {
+  const result = searchSettings(settings, "パソコン暗い");
+  assert.equal(result[0]?.slug, "change-brightness");
+});
+
+test("Wordの余白検索はアプリ名と目的語を同時に使う", () => {
+  const result = searchSettings([...settings, {
+    ...settings[0], id: "word-margin", slug: "word-change-margins", os: "word",
+    title: "Wordの余白を変更する", aliases: ["Word余白"], keywords: ["Word", "余白"],
+    path: ["Word", "レイアウト", "余白"], description: "Word文書の上下左右の余白を変更する方法です。",
+  }], "word 余白");
+  assert.equal(result[0]?.slug, "word-change-margins");
+});

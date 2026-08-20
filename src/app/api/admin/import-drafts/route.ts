@@ -27,6 +27,7 @@ import { troubleshootingUniqueSettings } from "../../../../../scripts/troublesho
 import { consolidateCandidates } from "../../../../../scripts/consolidate-candidates.mjs";
 import { wave3Settings } from "../../../../../scripts/official-settings-wave3-data.mjs";
 import { wave4Settings } from "../../../../../scripts/official-settings-wave4-data.mjs";
+import { prelaunchCuratedSettings } from "../../../../../scripts/prelaunch-curated-data.mjs";
 
 type Candidate = Omit<Setting, "id" | "updated_at">;
 type ImportScope = "all" | "troubleshoot" | "troubleshootUnique";
@@ -67,6 +68,7 @@ const rawCandidates = [
   ...troubleshootingUniqueSettings,
   ...wave3Settings,
   ...wave4Settings,
+  ...prelaunchCuratedSettings,
 ] as Candidate[];
 // 発生場面だけが異なる自動生成候補は、1テーマ1ページにまとめて取り込む。
 const candidates = [...new Map(consolidateCandidates(rawCandidates).map((item) => [key(item), item])).values()];
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     if (body && typeof body === "object" && "scope" in body) {
       const requestedScope = (body as { scope?: unknown }).scope;
-      if (requestedScope !== "all" && requestedScope !== "troubleshoot") {
+      if (requestedScope !== "all" && requestedScope !== "troubleshoot" && requestedScope !== "troubleshootUnique") {
         return NextResponse.json({ error: "取り込み対象を確認してください" }, { status: 400 });
       }
       scope = requestedScope;

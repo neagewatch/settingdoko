@@ -2,16 +2,33 @@
 /* 現在URLはブラウザのlocationを初回クライアント表示へ同期する。 */
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 
 export default function ShareBar({ title }: { title: string }) {
   const [currentUrl, setCurrentUrl] = useState("");
   const [urlCopied, setUrlCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const qrTriggerRef = useRef<HTMLButtonElement>(null);
+  const qrCloseRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setCurrentUrl(window.location.href);
   }, []);
+
+  useEffect(() => {
+    if (!showQR) return;
+    qrCloseRef.current?.focus();
+    const trigger = qrTriggerRef.current;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setShowQR(false);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      trigger?.focus();
+    };
+  }, [showQR]);
 
   const encodedUrl = encodeURIComponent(currentUrl);
   const encodedText = encodeURIComponent(`${title} | 設定どこ？`);
@@ -51,7 +68,7 @@ export default function ShareBar({ title }: { title: string }) {
           {urlCopied ? "✓ コピー済み" : "🔗 URLをコピー"}
         </button>
 
-        <button onClick={() => setShowQR(true)} className="share-btn share-btn-qr">
+        <button ref={qrTriggerRef} type="button" onClick={() => setShowQR(true)} className="share-btn share-btn-qr" aria-haspopup="dialog" aria-expanded={showQR}>
           📱 QRコード
         </button>
 
@@ -62,16 +79,15 @@ export default function ShareBar({ title }: { title: string }) {
 
       {showQR && currentUrl && (
         <div className="modal-backdrop" onClick={() => setShowQR(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>QRコード</h3>
+          <div className="modal-box" role="dialog" aria-modal="true" aria-labelledby="qr-dialog-title" onClick={e => e.stopPropagation()}>
+            <h3 id="qr-dialog-title" style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>QRコード</h3>
             <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>スマホでスキャンするとこのページが開きます</p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl=${encodedUrl}&choe=UTF-8`}
-              alt="QR Code" width={200} height={200}
+            <Image
+              src={`/api/qr?url=${encodedUrl}`}
+              alt="このページを開くQRコード" width={240} height={240}
               style={{ display: "block", margin: "0 auto 16px" }}
             />
-            <button onClick={() => setShowQR(false)}
+            <button ref={qrCloseRef} type="button" onClick={() => setShowQR(false)}
               style={{ padding: "8px 24px", borderRadius: 8, background: "var(--primary)", color: "white", border: "none", cursor: "pointer", fontSize: 14 }}>
               閉じる
             </button>

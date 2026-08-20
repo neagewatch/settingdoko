@@ -60,3 +60,21 @@ test("見直し期限を過ぎた記事を抽出する", () => {
   assert.equal(result.items.length, 1);
   assert.ok(result.items[0]?.issueCodes.includes("review-overdue"));
 });
+
+test("定型文が残る公開記事を高優先度で抽出する", () => {
+  const result = auditSettingsQuality([makeSetting({
+    description: "公式情報ベースの下書き候補です。設定・接続・権限・更新の順で原因を切り分ける手順です。",
+  })], NOW);
+  assert.equal(result.items[0]?.priority, "high");
+  assert.ok(result.items[0]?.issueCodes.includes("boilerplate-content"));
+  assert.ok(result.items[0]?.issueCodes.includes("draft-language"));
+});
+
+test("削除操作に注意書きがない記事を抽出する", () => {
+  const result = auditSettingsQuality([makeSetting({
+    title: "iPhoneの写真を完全に削除する",
+    description: "iPhoneの写真アプリから不要な写真を削除して、ストレージの空き容量を増やす方法です。",
+    caution: null,
+  })], NOW);
+  assert.ok(result.items[0]?.issueCodes.includes("risk-without-caution"));
+});

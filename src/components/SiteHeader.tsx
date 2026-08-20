@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/os/ios", label: "iPhone" },
   { href: "/os/android", label: "Android" },
   { href: "/os/macos", label: "Mac" },
+  { href: "/apps", label: "アプリ" },
 ];
 
 export default function SiteHeader() {
@@ -81,7 +82,7 @@ export default function SiteHeader() {
                 <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
               </button>
               {catOpen && (
-                <div id="category-menu" className="category-menu" role="menu" style={{
+                <div id="category-menu" className="category-menu" aria-label="カテゴリ一覧" style={{
                   position: "absolute", top: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
                   background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12,
                   boxShadow: "var(--shadow-lg)", padding: "8px", zIndex: 200,
@@ -96,7 +97,6 @@ export default function SiteHeader() {
                         fontSize: 13, transition: "background 0.1s", whiteSpace: "nowrap",
                       }}
                       className="cat-dropdown-item"
-                      role="menuitem"
                     >
                       <span className="category-menu-mark">{String(Object.keys(CATEGORIES).indexOf(key) + 1).padStart(2, "0")}</span>
                       <span>{label}</span>

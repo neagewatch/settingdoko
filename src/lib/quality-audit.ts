@@ -1,4 +1,5 @@
 import { getStepText, Setting } from "./types";
+import { getArticleRiskLevel, hasBoilerplateContent } from "./content-quality";
 
 export type QualityIssue =
   | "missing-title"
@@ -15,7 +16,10 @@ export type QualityIssue =
   | "missing-search-terms"
   | "missing-version"
   | "missing-impact"
-  | "missing-rollback";
+  | "missing-rollback"
+  | "boilerplate-content"
+  | "draft-language"
+  | "risk-without-caution";
 
 export type QualityPriority = "high" | "medium" | "low";
 
@@ -68,6 +72,9 @@ const ISSUE_LABELS: Record<QualityIssue, string> = {
   "missing-version": "対応バージョンが未入力",
   "missing-impact": "設定するとどうなるか未記載",
   "missing-rollback": "元に戻す方法が未記載",
+  "boilerplate-content": "自動生成の定型文が残っている",
+  "draft-language": "公開記事に下書き表現が残っている",
+  "risk-without-caution": "危険な操作に注意書きがない",
 };
 
 const ISSUE_WEIGHTS: Record<QualityIssue, number> = {
@@ -86,6 +93,9 @@ const ISSUE_WEIGHTS: Record<QualityIssue, number> = {
   "missing-version": 4,
   "missing-impact": 6,
   "missing-rollback": 4,
+  "boilerplate-content": 30,
+  "draft-language": 35,
+  "risk-without-caution": 28,
 };
 
 const HIGH_PRIORITY_ISSUES = new Set<QualityIssue>([
@@ -94,6 +104,9 @@ const HIGH_PRIORITY_ISSUES = new Set<QualityIssue>([
   "missing-path",
   "missing-steps",
   "invalid-source",
+  "boilerplate-content",
+  "draft-language",
+  "risk-without-caution",
 ]);
 
 function text(value: unknown): string {
@@ -148,6 +161,9 @@ function getIssues(setting: Setting, now: number): { codes: QualityIssue[]; metr
   if (!text(setting.version)) codes.push("missing-version");
   if (text(setting.impact).length < 10) codes.push("missing-impact");
   if (text(setting.rollback).length < 10) codes.push("missing-rollback");
+  if (hasBoilerplateContent(setting)) codes.push("boilerplate-content");
+  if (setting.status === "published" && /(下書き|公開前|候補記事)/.test(`${setting.title} ${setting.description}`)) codes.push("draft-language");
+  if (getArticleRiskLevel(setting) && !text(setting.caution)) codes.push("risk-without-caution");
 
   return { codes, metrics };
 }

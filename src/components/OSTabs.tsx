@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { OS_LABELS, OSType } from "@/lib/types";
+import { OS_LABELS, OSType, PLATFORM_TYPES } from "@/lib/types";
 
-const OS_LIST: OSType[] = ["windows11", "ios", "macos", "android"];
+const OS_LIST: readonly OSType[] = PLATFORM_TYPES;
 
 export default function OSTabs({
   current,

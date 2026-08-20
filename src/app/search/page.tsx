@@ -1,10 +1,9 @@
-import { searchDB, getAllSettings } from "@/lib/data";
+import { searchDB } from "@/lib/data";
 import { OSType, OS_LABELS, isOSType } from "@/lib/types";
 import SearchBox from "@/components/SearchBox";
 import SettingCard from "@/components/SettingCard";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { searchSettings } from "@/lib/search";
 import ContentRequestForm from "@/components/ContentRequestForm";
 import SearchTelemetry from "@/components/SearchTelemetry";
 
@@ -25,13 +24,6 @@ export default async function SearchPage({ searchParams }: Props) {
   const q = rawQ.trim().slice(0, 120);
   const osType = os && isOSType(os) ? os as OSType : undefined;
   const results = q ? await searchDB(q, osType) : [];
-
-  // ゼロヒット時の「もしかして」
-  let suggestions: Awaited<ReturnType<typeof searchDB>> = [];
-  if (q && results.length === 0) {
-    const all = await getAllSettings();
-    suggestions = searchSettings(all, q, osType).slice(0, 4);
-  }
 
   return (
     <div className="listing-page search-page" style={{ padding: "32px 0 60px" }}>
@@ -78,31 +70,6 @@ export default async function SearchPage({ searchParams }: Props) {
 
               <ContentRequestForm query={q} os={os} />
               <Link href="/diagnose" style={{ display: "inline-block", fontSize: 13, color: "var(--primary)", textDecoration: "none", margin: "18px 0 22px", fontWeight: 600 }}>症状から診断する →</Link>
-
-              {suggestions.length > 0 && (
-                <div style={{ marginBottom: 32 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>
-                    もしかして…
-                  </p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 480, margin: "0 auto" }}>
-                    {suggestions.map((s) => (
-                      <Link key={s.id} href={`/setting/${s.slug}?os=${s.os}`} style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        padding: "12px 16px", borderRadius: 10,
-                        background: "var(--surface)", border: "1px solid var(--border)",
-                        textDecoration: "none", color: "var(--text)",
-                        transition: "border-color 0.15s",
-                      }}>
-                        <span style={{ fontSize: 13, background: "var(--primary-soft)", color: "var(--primary)", padding: "2px 8px", borderRadius: 6, fontWeight: 600, whiteSpace: "nowrap" }}>
-                          {OS_LABELS[s.os]}
-                        </span>
-                        <span style={{ fontSize: 14, fontWeight: 500 }}>{s.title}</span>
-                        <span style={{ marginLeft: "auto", color: "var(--text-muted)" }}>→</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
                 {(["windows11", "ios", "macos", "android"] as const).map((o) => (

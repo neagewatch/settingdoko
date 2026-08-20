@@ -1,11 +1,47 @@
-export type OSType = "windows11" | "ios" | "macos" | "android" | "windows10";
-export type Difficulty = "beginner" | "intermediate" | "advanced";
-
 export const PRIMARY_OS_TYPES = ["windows11", "ios", "android", "macos"] as const;
 export type PrimaryOSType = (typeof PRIMARY_OS_TYPES)[number];
 
+export const APP_PLATFORM_TYPES = [
+  "ipados",
+  "chrome",
+  "edge",
+  "firefox",
+  "safari",
+  "word",
+  "excel",
+  "powerpoint",
+  "outlook",
+  "teams",
+  "gmail",
+  "google_calendar",
+  "google_drive",
+  "power_automate",
+  "line",
+  "slack",
+  "zoom",
+  "youtube",
+  "acrobat",
+] as const;
+
+export const PLATFORM_TYPES = [
+  ...PRIMARY_OS_TYPES,
+  "windows10",
+  ...APP_PLATFORM_TYPES,
+] as const;
+
+export type OSType = (typeof PLATFORM_TYPES)[number];
+export type AppPlatformType = (typeof APP_PLATFORM_TYPES)[number];
+export type Difficulty = "beginner" | "intermediate" | "advanced";
+
+const PLATFORM_TYPE_SET = new Set<string>(PLATFORM_TYPES);
+const APP_PLATFORM_TYPE_SET = new Set<string>(APP_PLATFORM_TYPES);
+
 export function isOSType(value: unknown): value is OSType {
-  return value === "windows11" || value === "ios" || value === "macos" || value === "android" || value === "windows10";
+  return typeof value === "string" && PLATFORM_TYPE_SET.has(value);
+}
+
+export function isAppPlatform(value: unknown): value is AppPlatformType {
+  return typeof value === "string" && APP_PLATFORM_TYPE_SET.has(value);
 }
 
 /**
@@ -65,6 +101,25 @@ export const OS_LABELS: Record<string, string> = {
   macos: "macOS",
   android: "Android",
   windows10: "Windows 10",
+  ipados: "iPad / iPadOS",
+  chrome: "Google Chrome",
+  edge: "Microsoft Edge",
+  firefox: "Firefox",
+  safari: "Safari",
+  word: "Microsoft Word",
+  excel: "Microsoft Excel",
+  powerpoint: "Microsoft PowerPoint",
+  outlook: "Microsoft Outlook",
+  teams: "Microsoft Teams",
+  gmail: "Gmail",
+  google_calendar: "Google カレンダー",
+  google_drive: "Google ドライブ",
+  power_automate: "Power Automate",
+  line: "LINE",
+  slack: "Slack",
+  zoom: "Zoom",
+  youtube: "YouTube",
+  acrobat: "Adobe Acrobat",
 };
 
 export const OS_ICONS: Record<string, string> = {
@@ -131,6 +186,10 @@ export const ALIAS_MAP: Record<string, string> = {
   "dns": "DNS", "mic": "マイク", "camera": "カメラ",
   "あんどろいど": "Android", "アンドロイド": "Android",
   "あいふぉん": "iPhone", "iphone": "iPhone", "ios": "iPhone",
-  "うぃんどうず": "Windows", "win": "Windows", "windows": "Windows",
+  "うぃんどうず": "Windows", "パソコン": "Windows", "ぱそこん": "Windows", "windows": "Windows", "win": "Windows",
+  "わーど": "Word", "ワード": "Word", "えくせる": "Excel", "エクセル": "Excel",
+  "ちーむす": "Teams", "チームス": "Teams", "あうとるっく": "Outlook", "アウトルック": "Outlook",
+  "word": "Word", "まーじん": "余白",
+  "しゃしん": "写真", "しゃしんけす": "写真削除",
   "おん": "オン", "おふ": "オフ", "きょか": "許可",
 };

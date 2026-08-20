@@ -52,8 +52,11 @@ export function FontSizeToggle() {
   return (
     <button
       className="icon-btn"
+      type="button"
       onClick={toggle}
       title={large ? "標準サイズに戻す" : "文字を大きくする"}
+      aria-label={large ? "文字を標準サイズに戻す" : "文字を大きくする"}
+      aria-pressed={large}
       style={{ fontSize: 14, fontWeight: 700 }}
     >
       {large ? "A" : "A+"}

@@ -1,7 +1,7 @@
 export const revalidate = 60;
 
 import { getSettingsBySlug, getRelatedSettings, getSettingsByOS } from "@/lib/data";
-import { OSType, Setting, OS_LABELS, CATEGORIES, getStepImage, getStepText, isOSType } from "@/lib/types";
+import { OSType, Setting, OS_LABELS, CATEGORIES, getStepImage, isOSType } from "@/lib/types";
 import PathTrail from "@/components/PathTrail";
 import OSTabs from "@/components/OSTabs";
 import OSBadge from "@/components/OSBadge";
@@ -16,6 +16,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { safeJsonLd } from "@/lib/structured-data";
+import { getArticleRiskLevel, isReviewOverdue, isSettingIndexable, sourceLabel, type ArticleRiskLevel } from "@/lib/content-quality";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
 
@@ -33,9 +34,11 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   if (!setting) return { title: "設定が見つかりません" };
   const versionLabel = setting.version ? ` ${setting.version}` : "";
   const ogImageUrl = `${BASE_URL}/api/og?title=${encodeURIComponent(setting.title)}&os=${setting.os}&path=${encodeURIComponent(setting.path.join(" › "))}`;
+  const description = `${setting.description} 対応：${OS_LABELS[setting.os]}${versionLabel}`.slice(0, 160);
   return {
     title: `${setting.title}（${OS_LABELS[setting.os]}${versionLabel}）`,
-    description: `${OS_LABELS[setting.os]}${versionLabel}で${setting.title}方法。設定場所：${setting.path.join(" > ")}`,
+    description,
+    robots: isSettingIndexable(setting) ? undefined : { index: false, follow: true },
     openGraph: {
       title: `${setting.title} | 設定どこ？`,
       description: setting.description,
@@ -84,25 +87,36 @@ async function renderDetail(
     .map(getStepImage)
     .flatMap(({ image_url }) => image_url ? [image_url] : []);
 
-  const jsonLd = {
-    "@context": "https://schema.org", "@type": "HowTo",
-    name: setting.title, description: setting.description, dateModified: setting.updated_at,
+  const canonicalUrl = `${BASE_URL}/setting/${setting.slug}?os=${setting.os}`;
+  const articleLd = {
+    "@context": "https://schema.org", "@type": "Article",
+    headline: setting.title,
+    description: setting.description,
+    datePublished: setting.published_at || setting.updated_at,
+    dateModified: setting.updated_at,
+    mainEntityOfPage: canonicalUrl,
+    articleSection: CATEGORIES[setting.category] || setting.category,
+    author: { "@type": "Organization", name: "設定どこ？", url: BASE_URL },
+    publisher: { "@type": "Organization", name: "設定どこ？", url: BASE_URL },
+    ...(setting.source_url ? { citation: setting.source_url } : {}),
     ...(stepImages.length > 0 ? { image: stepImages } : setting.screenshot_url ? { image: [setting.screenshot_url] } : {}),
-    step: setting.steps.map((step, i) => ({ "@type": "HowToStep", position: i + 1, text: getStepText(step) })),
   };
   const breadcrumbLd = {
     "@context": "https://schema.org", "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "ホーム", item: `${BASE_URL}/` },
       { "@type": "ListItem", position: 2, name: OS_LABELS[setting.os], item: `${BASE_URL}/os/${setting.os}` },
-      { "@type": "ListItem", position: 3, name: setting.title },
+      { "@type": "ListItem", position: 3, name: setting.title, item: canonicalUrl },
     ],
   };
   const card = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "24px 28px", marginBottom: 14 };
+  const riskLevel = getArticleRiskLevel(setting);
+  const reviewOverdue = isReviewOverdue(setting);
+  const risk = riskPresentation(riskLevel);
 
   return (
     <div className="setting-page" style={{ padding: "28px 0 60px" }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(articleLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }} />
       <ViewTracker slug={slug} os={setting.os} title={setting.title} />
 
@@ -113,13 +127,13 @@ async function renderDetail(
       </div>
 
       {/* Breadcrumb */}
-      <div className="breadcrumb no-print" style={{ marginBottom: 20, fontSize: 13, color: "var(--text-muted)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+      <nav className="breadcrumb no-print" aria-label="パンくず" style={{ marginBottom: 20, fontSize: 13, color: "var(--text-muted)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         <Link href="/" style={{ color: "var(--text-muted)", textDecoration: "none" }}>トップ</Link>
         <span>›</span>
         <Link href={`/os/${setting.os}`} style={{ color: "var(--text-muted)", textDecoration: "none" }}>{OS_LABELS[setting.os]}</Link>
         <span>›</span>
         <span style={{ color: "var(--text-secondary)" }}>{setting.title}</span>
-      </div>
+      </nav>
 
       {/* OS Tabs */}
       {availableOS.length > 1 && (
@@ -139,6 +153,9 @@ async function renderDetail(
               <OSBadge os={setting.os} />
               <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{setting.version}</span>
               <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{CATEGORIES[setting.category] || setting.category}</span>
+              <span className="article-status-chip">全{setting.steps.length}手順</span>
+              {setting.verified_at && <span className="article-status-chip verified">{new Date(setting.verified_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long" })}確認</span>}
+              {risk && <span className={`article-status-chip risk-${riskLevel}`}>{risk.label}</span>}
             </div>
             <h1 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 10px", letterSpacing: "-0.01em" }}>{setting.title}</h1>
             <p style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>{setting.description}</p>
@@ -169,6 +186,18 @@ async function renderDetail(
       {!setting.verified_at && (
         <aside className="verification-note" style={{ ...card, padding: "14px 18px", borderColor: "#FBBF24", background: "#FFFBEB", color: "#92400E", fontSize: 13, lineHeight: 1.7 }}>
           <strong>確認日未登録：</strong>OSの更新で設定名や場所が変わることがあります。画面が異なる場合は、下の「情報が古い・間違いを報告」から教えてください。
+        </aside>
+      )}
+
+      {reviewOverdue && (
+        <aside className="verification-note" style={{ ...card, padding: "14px 18px", fontSize: 13, lineHeight: 1.7 }}>
+          <strong>再確認が必要です：</strong>見直し予定日を過ぎています。画面や項目名が違う場合は、ページ下部からお知らせください。
+        </aside>
+      )}
+
+      {risk && !setting.caution && (
+        <aside className={`risk-notice risk-${riskLevel}`} style={{ ...card, padding: "16px 18px" }}>
+          <strong>{risk.label}：</strong>{risk.fallback}
         </aside>
       )}
 
@@ -207,7 +236,7 @@ async function renderDetail(
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: "var(--text-muted)" }}>更新: {new Date(setting.updated_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}</span>
               {setting.verified_at ? <span style={{ fontSize: 12, color: "#15803D" }}>✓ {new Date(setting.verified_at).toLocaleDateString("ja-JP")}に確認</span> : <span style={{ fontSize: 12, color: "var(--danger)" }}>検証日未登録</span>}
-              {setting.source_url && <a href={setting.source_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--primary)", textDecoration: "none" }}>公式情報 ↗</a>}
+              {setting.source_url && <a href={setting.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--primary)", textDecoration: "none" }}>{sourceLabel(setting.source_url)} ↗</a>}
             </div>
             <ReportButton settingId={setting.id} title={setting.title} />
           </div>
@@ -222,7 +251,7 @@ async function renderDetail(
       {/* Related */}
       {related.length > 0 && (
         <div className="related-card" style={card}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 14px" }}>関連する設定</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 14px" }}>関連する設定・解決方法</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {related.map((r) => (
               <Link key={r.id} href={`/setting/${r.slug}?os=${r.os}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 10, background: "var(--surface-2)", textDecoration: "none", color: "var(--text)" }}>
@@ -253,9 +282,17 @@ async function renderDetail(
 
       <div className="no-print" style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
         <Link href={`/os/${setting.os}`} style={{ fontSize: 13, color: "var(--text-muted)", textDecoration: "none" }}>
-          ← {OS_LABELS[setting.os]}の設定一覧に戻る
+          ← {OS_LABELS[setting.os]}のガイド一覧に戻る
         </Link>
       </div>
     </div>
   );
+}
+
+function riskPresentation(level: ArticleRiskLevel | null): { label: string; fallback: string } | null {
+  if (level === "data-loss") return { label: "データ消失の可能性", fallback: "削除・初期化・リセットの前に、必要なデータと復旧方法を確認してください。" };
+  if (level === "security") return { label: "セキュリティ注意", fallback: "保護機能を弱める変更は影響を理解し、必要な範囲だけで行ってください。" };
+  if (level === "admin") return { label: "管理者権限の可能性", fallback: "会社・学校の端末では実行せず、管理者へ確認してください。" };
+  if (level === "caution") return { label: "注意事項あり", fallback: "注意事項を確認してから操作してください。" };
+  return null;
 }
