@@ -134,8 +134,8 @@ export function searchSettings(
       // トラブル記事を先頭に出すと解決したい操作へ遠回りになる。
       if (s.category === "troubleshoot") score += troubleshootingQuery ? 4 : -35;
       if (!troubleshootingQuery && /(暗い|暗く|まぶしい)/i.test(q)) {
-        if (title.includes("明るさを変更")) score += 18;
-        if (title.includes("自動調整")) score -= 8;
+        if (title.includes("明るさを変更")) score += 60;
+        if (title.includes("自動調整")) score -= 15;
       }
       if (s.verified_at) score += 2;
       score += matched * 3;
