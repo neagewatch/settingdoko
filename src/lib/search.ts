@@ -1,4 +1,5 @@
 import { getStepText, Setting, OSType, ALIAS_MAP, PLATFORM_TYPES } from "./types";
+import { hasBoilerplateContent } from "./content-quality";
 
 /** 設定名を知らない人の「目的」を、検索に使える言葉へ展開する。 */
 const PURPOSE_TERMS: Array<{ matches: RegExp; terms: string[] }> = [
@@ -125,6 +126,10 @@ export function searchSettings(
       if (title.includes(q)) score += 25;
       if (aliases.some((alias) => alias === q)) score += 30;
       if (ERROR_CODE_PATTERN.test(q) && (title.includes(q) || aliases.some((alias) => alias.includes(q)))) score += 80;
+      // 自動生成の発生場面テンプレートは検索可能なままにするが、
+      // 具体的な設定記事より先に出て初心者を迷わせないよう減点する。
+      if (hasBoilerplateContent(s)) score -= 18;
+      if (s.verified_at) score += 2;
       score += matched * 3;
       return { setting: s, score, matched };
     })

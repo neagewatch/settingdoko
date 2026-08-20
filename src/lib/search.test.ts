@@ -46,3 +46,18 @@ test("Wordの余白検索はアプリ名と目的語を同時に使う", () => {
   }], "word 余白");
   assert.equal(result[0]?.slug, "word-change-margins");
 });
+
+test("定型トラブル記事より具体的な設定記事を優先する", () => {
+  const direct = {
+    ...settings[0], id: "direct-brightness", slug: "direct-brightness", title: "画面の明るさを変更する",
+    description: "画面の明るさを変更する方法です。",
+    aliases: ["画面暗く", "明るさ"], keywords: ["明るさ", "ディスプレイ"],
+    path: ["設定", "システム", "ディスプレイ", "明るさ"], verified_at: "2026-08-19T00:00:00.000Z",
+  } satisfies Setting;
+  const boilerplate = {
+    ...direct, id: "template-brightness", slug: "template-brightness",
+    title: "Windows 11で画面の明るさを変更できないときの対処",
+    description: "該当する発生場面でWindowsの明るさが変えられないが起きたときの確認手順です。 発生場面：更新時、インストール時、サインイン時。",
+  } satisfies Setting;
+  assert.equal(searchSettings([boilerplate, direct], "パソコン暗い")[0]?.slug, "direct-brightness");
+});
