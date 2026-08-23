@@ -61,3 +61,18 @@ test("定型トラブル記事より具体的な設定記事を優先する", ()
   } satisfies Setting;
   assert.equal(searchSettings([boilerplate, direct], "パソコン暗い")[0]?.slug, "direct-brightness");
 });
+
+test("口語の文字サイズ検索とパスワード変更検索を展開する", () => {
+  const textSize = {
+    ...settings[0], id: "text-size", slug: "change-text-size", title: "Windows 11で文字を大きくする",
+    aliases: ["文字でかくしたい"], keywords: ["文字サイズ", "表示サイズ"],
+    path: ["設定", "アクセシビリティ", "テキストのサイズ"],
+  } satisfies Setting;
+  const password = {
+    ...settings[0], id: "password", slug: "change-password", title: "パスワードを変更する",
+    aliases: ["パスワード変える"], keywords: ["パスワード", "アカウント"],
+    path: ["設定", "アカウント", "サインイン オプション"],
+  } satisfies Setting;
+  assert.equal(searchSettings([textSize], "文字でかくしたい")[0]?.slug, "change-text-size");
+  assert.equal(searchSettings([password], "パスワード変える")[0]?.slug, "change-password");
+});

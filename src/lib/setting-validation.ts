@@ -132,6 +132,7 @@ export function parseSettingWriteInput(value: unknown): SettingWriteInput | null
     impact: optionalText("impact", 1000),
     rollback: optionalText("rollback", 1000),
     caution: optionalText("caution", 1000),
+    if_missing: optionalText("if_missing", 1200),
     review_due_at: reviewDueAt,
   };
 }

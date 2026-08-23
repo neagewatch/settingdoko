@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import { getProgress, toggleStep, clearProgress } from "@/lib/analytics";
 import { getStepImage, getStepText, SettingStep } from "@/lib/types";
+import Image from "next/image";
 
 export default function StepChecklist({
   steps,
@@ -112,14 +113,23 @@ function StepContent({ step }: { step: SettingStep }) {
     <span style={{ minWidth: 0, flex: 1 }}>
       <span className="step-text">{getStepText(step)}</span>
       {image_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={image_url}
-          alt={image_alt || getStepText(step)}
-          loading="lazy"
-          style={{ display: "block", width: "100%", maxWidth: 640, height: "auto", marginTop: 12, borderRadius: 8, border: "1px solid var(--border)" }}
-        />
+        isSupabaseImage(image_url) ? (
+          <Image src={image_url} alt={image_alt || getStepText(step)} width={640} height={360} sizes="(max-width: 640px) 100vw, 640px" style={{ display: "block", width: "100%", maxWidth: 640, height: "auto", marginTop: 12, borderRadius: 8, border: "1px solid var(--border)" }} />
+        ) : (
+          // 旧データの外部画像は従来どおり表示する。
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image_url} alt={image_alt || getStepText(step)} loading="lazy" decoding="async" style={{ display: "block", width: "100%", maxWidth: 640, height: "auto", marginTop: 12, borderRadius: 8, border: "1px solid var(--border)" }} />
+        )
       )}
     </span>
   );
+}
+
+function isSupabaseImage(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname.endsWith(".supabase.co");
+  } catch {
+    return false;
+  }
 }

@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS settings (
   related_slugs TEXT[]      DEFAULT '{}',
   keywords      TEXT[]      DEFAULT '{}',
   description   TEXT        NOT NULL DEFAULT '',
+  view_count    INTEGER     NOT NULL DEFAULT 0,
+  helpful_count INTEGER     NOT NULL DEFAULT 0,
   difficulty    TEXT        CHECK (difficulty IN ('beginner','intermediate','advanced')),
   estimate_minutes INTEGER,
   updated_at    TIMESTAMPTZ DEFAULT NOW(),
@@ -31,6 +33,7 @@ CREATE TABLE IF NOT EXISTS settings (
   impact        TEXT,
   rollback      TEXT,
   caution       TEXT,
+  if_missing    TEXT,
   review_due_at TIMESTAMPTZ
 );
 

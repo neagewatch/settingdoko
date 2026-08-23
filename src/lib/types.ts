@@ -90,6 +90,8 @@ export interface Setting {
   impact?: string | null;
   rollback?: string | null;
   caution?: string | null;
+  /** 想定の項目が見つからない場合の分岐・確認事項。 */
+  if_missing?: string | null;
   review_due_at?: string | null;
 }
 
@@ -187,9 +189,10 @@ export const ALIAS_MAP: Record<string, string> = {
   "あんどろいど": "Android", "アンドロイド": "Android",
   "あいふぉん": "iPhone", "iphone": "iPhone", "ios": "iPhone",
   "うぃんどうず": "Windows", "パソコン": "Windows", "ぱそこん": "Windows", "windows": "Windows", "win": "Windows",
-  "わーど": "Word", "ワード": "Word", "えくせる": "Excel", "エクセル": "Excel",
+  "わーど": "Word", "えくせる": "Excel", "エクセル": "Excel",
   "ちーむす": "Teams", "チームス": "Teams", "あうとるっく": "Outlook", "アウトルック": "Outlook",
-  "word": "Word", "まーじん": "余白",
+  // 「ワード」を単語全体で置換すると「パスワード」まで壊れるため、wordは小文字化だけで揃える。
+  "まーじん": "余白", "まいくろそふとわーど": "Word",
   "しゃしん": "写真", "しゃしんけす": "写真削除",
   "おん": "オン", "おふ": "オフ", "きょか": "許可",
 };

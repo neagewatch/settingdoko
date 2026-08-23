@@ -11,7 +11,7 @@ const EMPTY: Omit<Setting, "id" | "updated_at"> = {
   aliases: [], path: [], steps: [], related_slugs: [], keywords: [],
   description: "", screenshot_url: "",
   status: "draft", published_at: null, verified_at: null, editor_note: "",
-  source_url: "", device_scope: "", impact: "", rollback: "", caution: "", review_due_at: null,
+  source_url: "", device_scope: "", impact: "", rollback: "", caution: "", if_missing: "", review_due_at: null,
 };
 
 function parseLines(text: string): string[] {
@@ -47,7 +47,7 @@ export function SettingEditorPage({
           status: setting.status || "published", published_at: setting.published_at || null,
           verified_at: setting.verified_at || null, editor_note: setting.editor_note || "", source_url: setting.source_url || "",
           device_scope: setting.device_scope || "", impact: setting.impact || "", rollback: setting.rollback || "",
-          caution: setting.caution || "", review_due_at: setting.review_due_at || null }
+          caution: setting.caution || "", if_missing: setting.if_missing || "", review_due_at: setting.review_due_at || null }
       : { ...EMPTY }
   );
   const [aliasText, setAliasText] = useState(toLines(setting?.aliases || []));
@@ -250,6 +250,11 @@ export function SettingEditorPage({
           <div style={{ gridColumn: "1/-1" }}>
             <label style={label}>注意事項（任意）</label>
             <textarea style={textarea} rows={2} value={form.caution || ""} onChange={(e) => setForm((f) => ({ ...f, caution: e.target.value }))} placeholder="データ消失・権限・再起動などの注意" />
+          </div>
+          <div style={{ gridColumn: "1/-1" }}>
+            <label style={label}>項目が見つからない場合（任意）</label>
+            <textarea style={textarea} rows={2} maxLength={1200} value={form.if_missing || ""} onChange={(e) => setForm((f) => ({ ...f, if_missing: e.target.value.slice(0, 1200) }))} placeholder="例：Windows 10では場所が異なります。会社・学校の端末では管理者により変更できない場合があります。" />
+            <div style={{ marginTop: 4, fontSize: 11, color: "var(--text-muted)" }}>項目名が違う・表示されない場合に、次に確認することを書きます。</div>
           </div>
           <div>
             <label style={label}>次回見直し日</label>

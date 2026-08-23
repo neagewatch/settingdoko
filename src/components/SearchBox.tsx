@@ -33,6 +33,10 @@ export default function SearchBox({
   const listId = `${inputId}-suggestions`;
 
   useEffect(() => {
+    setQuery(defaultValue || "");
+  }, [defaultValue]);
+
+  useEffect(() => {
     abortRef.current?.abort();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const searchQuery = query.trim();
@@ -131,6 +135,7 @@ export default function SearchBox({
         style={large ? { padding: "18px 52px 18px 52px", fontSize: 18, borderRadius: 16 } : {}}
         autoComplete="off"
         role="combobox"
+        aria-haspopup="listbox"
         aria-autocomplete="list"
         aria-expanded={open}
         aria-controls={listId}
@@ -146,6 +151,7 @@ export default function SearchBox({
             position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
             background: "none", border: "none", cursor: "pointer",
             color: "var(--text-muted)", fontSize: 18, padding: 8,
+            minWidth: 44, minHeight: 44,
           }}
         >×</button>
       )}

@@ -1,6 +1,6 @@
 import { MetadataRoute } from "next";
 import { getAllSettings } from "@/lib/data";
-import { CATEGORIES, PRIMARY_OS_TYPES } from "@/lib/types";
+import { APP_PLATFORM_TYPES, CATEGORIES, PRIMARY_OS_TYPES } from "@/lib/types";
 import { isSettingIndexable } from "@/lib/content-quality";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
@@ -18,12 +18,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // OS一覧ページ
-  const osUrls = PRIMARY_OS_TYPES.map((os) => ({
-    url: `${BASE_URL}/os/${os}`,
-    lastModified: latestDate(settings.filter((setting) => setting.os === os)),
-    changeFrequency: "weekly" as const,
-    priority: 0.7,
-  }));
+  const osUrls = PRIMARY_OS_TYPES
+    .filter((os) => settings.some((setting) => setting.os === os))
+    .map((os) => ({
+      url: `${BASE_URL}/os/${os}`,
+      lastModified: latestDate(settings.filter((setting) => setting.os === os)),
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }));
+
+  // アプリ・ブラウザも記事が存在するプラットフォームだけ掲載する。
+  // 空の一覧ページをサイトマップへ増やさないため、品質判定後の件数で絞る。
+  const appUrls = APP_PLATFORM_TYPES
+    .filter((platform) => settings.some((setting) => setting.os === platform))
+    .map((platform) => ({
+      url: `${BASE_URL}/os/${platform}`,
+      lastModified: latestDate(settings.filter((setting) => setting.os === platform)),
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
+    }));
 
   const categoryUrls = [...new Set(settings.map((setting) => setting.category))].filter((category) => CATEGORIES[category]).map((category) => ({
     url: `${BASE_URL}/category/${category}`,
@@ -54,6 +67,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: BASE_URL, lastModified: latestDate(publishedSettings), changeFrequency: "daily", priority: 1.0 },
     { url: `${BASE_URL}/diagnose`, lastModified: latestDate(publishedSettings), changeFrequency: "weekly", priority: 0.8 },
     ...osUrls,
+    ...appUrls,
     ...categoryUrls,
     ...featureUrls,
     ...informationUrls,

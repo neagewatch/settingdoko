@@ -1,7 +1,8 @@
 import DiagnoseClient from "./DiagnoseClient";
 import type { Metadata } from "next";
 import { getAllSettings } from "@/lib/data";
-import type { OSType } from "@/lib/types";
+import { OS_LABELS, type OSType, type Setting } from "@/lib/types";
+import { searchSettings } from "@/lib/search";
 
 export const revalidate = 60;
 export const metadata: Metadata = { title: "症状からトラブル解決方法を探す", description: "Wi-Fi、通知、音声、バッテリー、画面などの困りごとから解決方法を探せます。", alternates: { canonical: "/diagnose" } };
@@ -72,11 +73,28 @@ export default async function DiagnosePage() {
   const settings = await getAllSettings();
   const options = OPTION_DEFINITIONS.map((option) => ({
     ...option,
-    // 未公開記事へのリンクを生成しない。公開後は自動的に診断ページへ現れる。
-    targets: option.targets.filter((target) => settings.some(
-      (setting) => setting.category === "troubleshoot" && setting.slug === target.slug && setting.os === target.os,
-    )),
+    // 旧slugが整理されても404にならないよう、存在する記事を優先し、
+    // 見つからない場合は同じ症状の公開トラブル記事を決定的に選ぶ。
+    targets: resolveTargets(option, settings),
   }));
 
   return <DiagnoseClient options={options} />;
+}
+
+function resolveTargets(option: Option, settings: Setting[]): Target[] {
+  const exactTargets = option.targets.filter((target) => settings.some(
+      (setting) => setting.category === "troubleshoot" && setting.slug === target.slug && setting.os === target.os,
+  ));
+  if (exactTargets.length > 0) return exactTargets;
+
+  const seen = new Set<string>();
+  return searchSettings(settings, option.query)
+    .filter((setting) => setting.category === "troubleshoot")
+    .filter((setting) => {
+      if (seen.has(setting.os)) return false;
+      seen.add(setting.os);
+      return true;
+    })
+    .slice(0, 4)
+    .map((setting) => ({ label: OS_LABELS[setting.os] || setting.os, slug: setting.slug, os: setting.os }));
 }

@@ -17,6 +17,8 @@ import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { safeJsonLd } from "@/lib/structured-data";
 import { getArticleRiskLevel, isReviewOverdue, isSettingIndexable, sourceLabel, type ArticleRiskLevel } from "@/lib/content-quality";
+import { normalizeQuery } from "@/lib/search";
+import Image from "next/image";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
 
@@ -80,9 +82,27 @@ async function renderDetail(
   const prevSetting = currentIdx > 0 ? catSettings[currentIdx - 1] : null;
   const nextSetting = currentIdx < catSettings.length - 1 ? catSettings[currentIdx + 1] : null;
   const explicitlyRelated = await getRelatedSettings(setting.related_slugs, setting.id);
-  const related = explicitlyRelated.length > 0
-    ? explicitlyRelated
-    : catSettings.filter((item) => item.id !== setting.id).slice(0, 4);
+  const relatedTerms = new Set(
+    [setting.title, ...setting.aliases, ...setting.keywords]
+      .flatMap((value) => normalizeQuery(value).split(/\s+/))
+      .filter((value) => value.length >= 2),
+  );
+  const contextualRelated = osSettings
+    .filter((item) => item.id !== setting.id && !explicitlyRelated.some((relatedItem) => relatedItem.id === item.id))
+    .map((item) => {
+      const candidateTerms = new Set(
+        [item.title, ...item.aliases, ...item.keywords]
+          .flatMap((value) => normalizeQuery(value).split(/\s+/))
+          .filter((value) => value.length >= 2),
+      );
+      const sharedTerms = [...relatedTerms].filter((term) => [...candidateTerms].some((candidate) => candidate.includes(term) || term.includes(candidate))).length;
+      const sameCategoryBonus = item.category === setting.category ? 3 : 0;
+      const problemBonus = item.category === "troubleshoot" || setting.category === "troubleshoot" ? 2 : 0;
+      return { item, score: sharedTerms * 10 + sameCategoryBonus + problemBonus };
+    })
+    .sort((left, right) => right.score - left.score || left.item.title.localeCompare(right.item.title, "ja"))
+    .map(({ item }) => item);
+  const related = [...explicitlyRelated, ...contextualRelated].slice(0, 5);
   const stepImages = setting.steps
     .map(getStepImage)
     .flatMap(({ image_url }) => image_url ? [image_url] : []);
@@ -151,9 +171,10 @@ async function renderDetail(
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
               <OSBadge os={setting.os} />
-              <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{setting.version}</span>
+              {setting.version && <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{setting.version}</span>}
               <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{CATEGORIES[setting.category] || setting.category}</span>
               <span className="article-status-chip">全{setting.steps.length}手順</span>
+              {setting.estimate_minutes && <span className="article-status-chip">目安{setting.estimate_minutes}分</span>}
               {setting.verified_at && <span className="article-status-chip verified">{new Date(setting.verified_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long" })}確認</span>}
               {risk && <span className={`article-status-chip risk-${riskLevel}`}>{risk.label}</span>}
             </div>
@@ -207,8 +228,13 @@ async function renderDetail(
           <div style={{ marginBottom: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定画面スクリーンショット</span>
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={setting.screenshot_url} alt={setting.title} style={{ width: "100%", borderRadius: 12, border: "1px solid var(--border)", display: "block" }} />
+          {isSupabaseImage(setting.screenshot_url) ? (
+            <Image src={setting.screenshot_url} alt={setting.title} width={1200} height={675} sizes="(max-width: 840px) 100vw, 840px" style={{ width: "100%", height: "auto", borderRadius: 12, border: "1px solid var(--border)", display: "block" }} />
+          ) : (
+            // 管理画面に登録された旧URLも壊さず表示する。新規画像はSupabaseへ保存する。
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={setting.screenshot_url} alt={setting.title} loading="lazy" decoding="async" style={{ width: "100%", borderRadius: 12, border: "1px solid var(--border)", display: "block" }} />
+          )}
         </div>
       )}
 
@@ -228,10 +254,17 @@ async function renderDetail(
         </div>
       )}
 
+      {setting.if_missing && (
+        <section className="notice-card if-missing-card" style={{ ...card, background: "var(--surface-2)" }} aria-labelledby="if-missing-heading">
+          <h2 id="if-missing-heading" style={{ margin: "0 0 8px", fontSize: 17 }}>項目が見つからない場合</h2>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.8 }}>{setting.if_missing}</p>
+        </section>
+      )}
+
       {/* Helpful + report */}
       <div className="feedback-card no-print" style={{ ...card, padding: "18px 28px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <HelpfulButton settingId={setting.id} />
+          <HelpfulButton settingId={setting.id} initialCount={setting.helpful_count || 0} />
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: "var(--text-muted)" }}>更新: {new Date(setting.updated_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}</span>
@@ -295,4 +328,13 @@ function riskPresentation(level: ArticleRiskLevel | null): { label: string; fall
   if (level === "admin") return { label: "管理者権限の可能性", fallback: "会社・学校の端末では実行せず、管理者へ確認してください。" };
   if (level === "caution") return { label: "注意事項あり", fallback: "注意事項を確認してから操作してください。" };
   return null;
+}
+
+function isSupabaseImage(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    return new URL(value).protocol === "https:" && new URL(value).hostname.endsWith(".supabase.co");
+  } catch {
+    return false;
+  }
 }

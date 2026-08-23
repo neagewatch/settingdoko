@@ -3,6 +3,7 @@ import "./globals.css";
 import Link from "next/link";
 import { DarkModeScript } from "@/components/DarkMode";
 import SiteHeader from "@/components/SiteHeader";
+import { safeJsonLd } from "@/lib/structured-data";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
 
@@ -23,6 +24,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja" suppressHydrationWarning>
       <head>
         <DarkModeScript />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "設定どこ？",
+          url: BASE_URL,
+          description: "PC・スマートフォンの設定方法とトラブル解決を検索できる案内サイトです。",
+          potentialAction: {
+            "@type": "SearchAction",
+            target: `${BASE_URL}/search?q={search_term_string}`,
+            "query-input": "required name=search_term_string",
+          },
+        }) }} />
       </head>
       <body>
         <SiteHeader />

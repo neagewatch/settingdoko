@@ -7,6 +7,13 @@ import type { Metadata } from "next";
 import ContentRequestForm from "@/components/ContentRequestForm";
 import SearchTelemetry from "@/components/SearchTelemetry";
 
+const FALLBACK_QUERIES = [
+  { label: "Wi-Fiにつながらない", q: "wifiつながらない" },
+  { label: "文字を大きくしたい", q: "文字大きくしたい" },
+  { label: "音が出ない", q: "音出ない" },
+  { label: "Bluetoothにつながらない", q: "Bluetoothつながらない" },
+];
+
 type Props = { searchParams: Promise<{ q?: string; os?: string }> };
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
@@ -75,6 +82,12 @@ export default async function SearchPage({ searchParams }: Props) {
                 {(["windows11", "ios", "macos", "android"] as const).map((o) => (
                   <Link key={o} href={`/os/${o}`} className="os-tab">{OS_LABELS[o]}</Link>
                 ))}
+              </div>
+              <div className="empty-search-links" aria-label="よくある検索">
+                <p>よくある困りごと</p>
+                <div>
+                  {FALLBACK_QUERIES.map((item) => <Link key={item.q} href={`/search?q=${encodeURIComponent(item.q)}`} className="os-tab">{item.label}</Link>)}
+                </div>
               </div>
             </div>
           )

@@ -29,14 +29,19 @@ function parsePage(value?: string): number {
   return Number.isFinite(parsed) ? Math.max(1, Math.min(1000, parsed)) : 1;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { os } = await params;
   const label = OS_LABELS[os];
   if (!label) return { title: "OS Not Found" };
+  const query = await searchParams;
+  const canonicalQuery = new URLSearchParams();
+  if (query.category && CATEGORIES[query.category]) canonicalQuery.set("category", query.category);
+  if (query.page && /^\d+$/.test(query.page) && Number(query.page) > 1) canonicalQuery.set("page", String(Math.min(1000, Number(query.page))));
+  const suffix = canonicalQuery.toString();
   return {
     title: `${label}の設定一覧`,
     description: `${label}の設定場所・最短手順を、目的と小ジャンルから探せます。`,
-    alternates: { canonical: `/os/${os}` },
+    alternates: { canonical: `/os/${os}${suffix ? `?${suffix}` : ""}` },
   };
 }
 

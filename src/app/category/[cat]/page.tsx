@@ -26,14 +26,21 @@ function pageHref(cat: string, page: number, os?: string): string {
   return `/category/${cat}${suffix ? `?${suffix}` : ""}`;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { cat } = await params;
   const label = CATEGORIES[cat];
   if (!label) return { title: "カテゴリ" };
+  const query = await searchParams;
+  const page = firstParam(query.page);
+  const os = firstParam(query.os);
+  const canonicalQuery = new URLSearchParams();
+  if (os && isOSType(os)) canonicalQuery.set("os", os);
+  if (page && /^\d+$/.test(page) && Number(page) > 1) canonicalQuery.set("page", String(Math.min(1000, Number(page))));
+  const suffix = canonicalQuery.toString();
   return {
     title: `${label}の設定・トラブル解決一覧`,
     description: `Windows 11・iPhone・Android・Mac・各種アプリの${label}に関する設定方法と解決手順を探せます。`,
-    alternates: { canonical: `/category/${cat}` },
+    alternates: { canonical: `/category/${cat}${suffix ? `?${suffix}` : ""}` },
   };
 }
 
