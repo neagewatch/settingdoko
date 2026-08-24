@@ -67,21 +67,13 @@ const uniquePackTitleDuplicates = troubleshootingUniqueSettings
 for (const duplicate of uniquePackTitleDuplicates) {
   errors.push(`新規重複タイトル: ${duplicate.title} (${duplicate.slug} / ${duplicate.matches.filter((slug: string) => slug !== duplicate.slug).join(", ")})`);
 }
-const slugOS = new Map<string, string>();
-for (const setting of consolidatedSettings) {
-  const previousOS = slugOS.get(setting.slug);
-  if (previousOS && previousOS !== setting.os) {
-    errors.push(`DB制約に抵触するslug重複: ${setting.slug} (${previousOS} / ${setting.os})`);
-  } else {
-    slugOS.set(setting.slug, setting.os);
-  }
-}
-// 本番DBのsettings_slug_key（slug単独）と同じ単位で監査する。
-const settings = [...new Map(consolidatedSettings.map((setting) => [setting.slug, setting])).values()] as Setting[];
+// 現行スキーマの一意制約はslug×OS。同じテーマのOS別記事を失わない。
+// consolidateCandidatesが正規候補を決めるため、ここでは黙って上書きしない。
+const settings = consolidatedSettings as Setting[];
 
 for (const [index, setting] of settings.entries()) {
   const label = `${setting.os}/${setting.slug || `index-${index}`}`;
-  const key = setting.slug;
+  const key = `${setting.slug}\u0000${setting.os}`;
   if (keys.has(key)) errors.push(`重複: ${label}`);
   keys.add(key);
   slugs.add(setting.slug);
@@ -103,10 +95,14 @@ for (const setting of settings) {
 
 const primaryCounts = Object.fromEntries(PRIMARY_OS_TYPES.map((os) => [os, settings.filter((setting) => setting.os === os).length]));
 console.log(`候補データ件数（重複除外）: ${settings.length}`);
-console.log(`類似候補の統合: ${consolidationReport.before}件 -> ${consolidationReport.after}件（${consolidationReport.duplicateRows}件削減）`);
+console.log(`候補整理: ${consolidationReport.before}件 -> ${consolidationReport.after}件（旧・条件違い除外 ${consolidationReport.skippedRows}件 / 類似統合 ${consolidationReport.duplicateRows}件 / slug×OS統合 ${consolidationReport.exactIdentifierRows}件）`);
 console.log(`主対象件数: ${JSON.stringify(primaryCounts)}`);
 console.log(`検証日あり: ${settings.filter((setting) => Boolean(setting.verified_at)).length}`);
 console.log(`情報源URLあり: ${settings.filter((setting) => Boolean(setting.source_url)).length}`);
+const unverifiedCount = settings.filter((setting) => !setting.verified_at).length;
+const relatedWarningCount = warnings.filter((warning) => warning.startsWith("関連slug未登録")).length;
+const sourceWarningCount = warnings.filter((warning) => warning.startsWith("情報源URL確認")).length;
+console.log(`警告内訳: 未検証 ${unverifiedCount}件 / 関連slug未登録 ${relatedWarningCount}件 / 情報源URL確認 ${sourceWarningCount}件 / 警告合計 ${warnings.length}件`);
 console.log(`今回追加パック: ${troubleshootingUniqueSettings.length}件 / 完全一致タイトル重複: ${uniquePackTitleDuplicates.length}件`);
 
 for (const warning of warnings.slice(0, 20)) console.warn(`WARN ${warning}`);

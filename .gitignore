@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Generated editorial operation reports (use --out-dir to choose another location)
+.content-operations/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

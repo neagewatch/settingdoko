@@ -32,6 +32,10 @@ export const PLATFORM_TYPES = [
 export type OSType = (typeof PLATFORM_TYPES)[number];
 export type AppPlatformType = (typeof APP_PLATFORM_TYPES)[number];
 export type Difficulty = "beginner" | "intermediate" | "advanced";
+export type ContentTypeValue = "setting" | "troubleshooting" | "error_code";
+export type WorkflowStatus = "discovered" | "candidate" | "draft" | "source_attached" | "verified" | "published" | "archived";
+export type IndexStatus = "auto" | "index" | "noindex";
+export type SettingSourceType = "OFFICIAL_SUPPORT" | "OFFICIAL_DOCUMENTATION" | "OFFICIAL_VENDOR" | "DEVICE_MANUFACTURER" | "TRUSTED_SECONDARY" | "UNKNOWN";
 
 const PLATFORM_TYPE_SET = new Set<string>(PLATFORM_TYPES);
 const APP_PLATFORM_TYPE_SET = new Set<string>(APP_PLATFORM_TYPES);
@@ -52,14 +56,27 @@ export type SettingStep = string | {
   text: string;
   image_url?: string;
   image_alt?: string;
+  /** スクリーンショットの保守判断に使う任意メタデータ。 */
+  image_captured_at?: string;
+  image_platform_version?: string;
+  image_device?: string;
 };
 
 export function getStepText(step: SettingStep): string {
   return typeof step === "string" ? step : step.text;
 }
 
-export function getStepImage(step: SettingStep): { image_url?: string; image_alt?: string } {
-  return typeof step === "string" ? {} : { image_url: step.image_url, image_alt: step.image_alt };
+export function getStepImage(step: SettingStep): {
+  image_url?: string; image_alt?: string; image_captured_at?: string;
+  image_platform_version?: string; image_device?: string;
+} {
+  return typeof step === "string" ? {} : {
+    image_url: step.image_url,
+    image_alt: step.image_alt,
+    image_captured_at: step.image_captured_at,
+    image_platform_version: step.image_platform_version,
+    image_device: step.image_device,
+  };
 }
 
 export interface Setting {
@@ -78,6 +95,7 @@ export interface Setting {
   updated_at: string;
   view_count?: number;
   helpful_count?: number;
+  not_helpful_count?: number;
   difficulty?: Difficulty;
   estimate_minutes?: number;
   screenshot_url?: string | null; // 追加：スクリーンショット画像URL
@@ -93,6 +111,15 @@ export interface Setting {
   /** 想定の項目が見つからない場合の分岐・確認事項。 */
   if_missing?: string | null;
   review_due_at?: string | null;
+  /** 運用上の明示指定。auto/index は品質判定を通過した記事だけをindex対象にする。 */
+  index_status?: IndexStatus;
+  content_type?: ContentTypeValue | null;
+  workflow_status?: WorkflowStatus | null;
+  source_type?: SettingSourceType | null;
+  verified_on_version?: string | null;
+  verified_from?: string | null;
+  verified_to?: string | null;
+  requires_reverification?: boolean;
 }
 
 export type SettingWriteInput = Omit<Setting, "id" | "updated_at" | "view_count" | "helpful_count">;
@@ -156,6 +183,13 @@ export const CATEGORIES: Record<string, string> = {
   app: "アプリ",
   account: "アカウント",
   troubleshoot: "トラブル解決",
+  battery: "バッテリー・電源",
+  developer: "開発者向け",
+  edit: "編集・書式",
+  share: "共有",
+  mail: "メール",
+  meeting: "会議・通話",
+  automation: "自動化",
 };
 
 export const CATEGORY_ICONS: Record<string, string> = {
@@ -163,6 +197,8 @@ export const CATEGORY_ICONS: Record<string, string> = {
   privacy: "🔒", notification: "🔔", storage: "💾", system: "⚙️",
   input: "⌨️", accessibility: "♿", security: "🛡", file: "📁",
   app: "📱", account: "👤", troubleshoot: "🛠",
+  battery: "🔋", developer: "⌨️", edit: "✏️", share: "↗",
+  mail: "✉️", meeting: "🎥", automation: "⚙️",
 };
 
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = {

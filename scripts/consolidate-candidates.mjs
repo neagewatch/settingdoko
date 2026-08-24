@@ -129,6 +129,41 @@ function mergeGroup(group) {
   };
 }
 
+function candidateStrength(item) {
+  const steps = Array.isArray(item.steps)
+    ? item.steps.map((step) => typeof step === "string" ? step : step?.text || "").join("").length
+    : 0;
+  return (item.source_url ? 10000 : 0)
+    + (item.verified_at ? 5000 : 0)
+    + (typeof item.description === "string" ? item.description.length * 10 : 0)
+    + steps
+    + (Array.isArray(item.aliases) ? item.aliases.length : 0);
+}
+
+function mergeIdentifierGroup(group) {
+  const strongest = [...group].sort((left, right) => candidateStrength(right) - candidateStrength(left))[0];
+  return {
+    ...strongest,
+    aliases: unique([
+      ...(Array.isArray(strongest.aliases) ? strongest.aliases : []),
+      ...group.filter((item) => item !== strongest).map((item) => item.title),
+      ...group.flatMap((item) => Array.isArray(item.aliases) ? item.aliases : []),
+    ]),
+    keywords: unique(group.flatMap((item) => Array.isArray(item.keywords) ? item.keywords : [])),
+    related_slugs: unique(group.flatMap((item) => Array.isArray(item.related_slugs) ? item.related_slugs : [])),
+    editor_note: [strongest.editor_note, "同一slug・OSの候補を決定的に統合しています。"].filter(Boolean).join(" "),
+  };
+}
+
+function mergeExactIdentifiers(items) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = `${item?.slug || ""}\u0000${item?.os || ""}`;
+    groups.set(key, [...(groups.get(key) || []), item]);
+  }
+  return [...groups.values()].map((group) => group.length === 1 ? group[0] : mergeIdentifierGroup(group));
+}
+
 function grouped(items) {
   const groups = new Map();
   for (const item of items) {
@@ -161,18 +196,20 @@ function consolidateCandidates(items) {
     emitted.add(key);
     result.push(mergeGroup(group));
   }
-  return result;
+  return mergeExactIdentifiers(result);
 }
 
 function getConsolidationReport(items) {
   const filteredItems = items.filter((item) => !shouldSkipCandidate(item));
   const groups = grouped(filteredItems);
   const duplicateRows = groups.reduce((sum, group) => sum + group.items.length - 1, 0);
+  const after = consolidateCandidates(items).length;
   return {
     groups: groups.length,
     before: items.length,
-    after: filteredItems.length - duplicateRows,
+    after,
     duplicateRows,
+    exactIdentifierRows: filteredItems.length - duplicateRows - after,
     skippedRows: items.length - filteredItems.length,
     details: groups.map((group) => ({
       key: group.key,

@@ -1,13 +1,21 @@
 import { MetadataRoute } from "next";
-import { getAllSettings } from "@/lib/data";
+import { getAllSettings, getStoredSourceHealth } from "@/lib/data";
 import { APP_PLATFORM_TYPES, CATEGORIES, PRIMARY_OS_TYPES } from "@/lib/types";
 import { isSettingIndexable } from "@/lib/content-quality";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
 
+// DB側の記事・情報源ヘルスが更新された後も、再デプロイなしで
+// サイトマップの公開対象を追随させる。毎リクエストではなく1時間ごとに再生成する。
+export const revalidate = 3600;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const publishedSettings = (await getAllSettings()).filter((setting) => setting.status !== "draft");
-  const settings = publishedSettings.filter((setting) => isSettingIndexable(setting));
+  const [allSettings, sourceHealth] = await Promise.all([getAllSettings(), getStoredSourceHealth()]);
+  const publishedSettings = allSettings.filter((setting) => setting.status !== "draft");
+  const settings = publishedSettings.filter((setting) => {
+    const health = setting.source_url ? sourceHealth.get(setting.source_url) : undefined;
+    return isSettingIndexable(setting) && health !== "broken" && health !== "invalid";
+  });
 
   // 設定詳細ページ（slug×OS）
   const settingUrls = settings.map((s) => ({

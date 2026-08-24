@@ -3,6 +3,7 @@
 const SEARCH_LOG_KEY = "sdoko_search_log";
 const VIEW_LOG_KEY = "sdoko_view_log";
 const HELPFUL_KEY = "sdoko_helpful";
+const FEEDBACK_TOKEN_KEY = "sdoko_feedback_token";
 const BOOKMARK_KEY = "sdoko_bookmarks";
 const STEP_PROGRESS_KEY = "sdoko_progress";
 const MAX_LOG = 200;
@@ -85,6 +86,25 @@ export function markHelpful(settingId: string) {
 }
 export function isHelpful(settingId: string): boolean {
   return !!(safeGet(HELPFUL_KEY, {}) as Record<string,boolean>)[settingId];
+}
+export function markFeedback(settingId: string, result: "helpful" | "not_helpful") {
+  const map: Record<string, boolean | string> = safeGet(HELPFUL_KEY, {});
+  map[settingId] = result;
+  safeSet(HELPFUL_KEY, map);
+}
+export function getFeedbackResult(settingId: string): "helpful" | "not_helpful" | null {
+  const value = (safeGet(HELPFUL_KEY, {}) as Record<string, boolean | string>)[settingId];
+  if (value === true || value === "helpful") return "helpful";
+  return value === "not_helpful" ? "not_helpful" : null;
+}
+export function getFeedbackToken(): string {
+  const existing = safeGet<string>(FEEDBACK_TOKEN_KEY, "");
+  if (/^[0-9a-f-]{36}$/i.test(existing)) return existing;
+  const token = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, "0").slice(-12)}`;
+  safeSet(FEEDBACK_TOKEN_KEY, token);
+  return token;
 }
 
 // ブックマーク

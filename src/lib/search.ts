@@ -18,6 +18,7 @@ const PURPOSE_TERMS: Array<{ matches: RegExp; terms: string[] }> = [
   { matches: /bluetooth|ブルートゥース|イヤホン|ペアリング/i, terms: ["Bluetooth", "接続", "ペアリング", "イヤホン"] },
   { matches: /カメラ|写真.*撮れ|ビデオ.*使え/i, terms: ["カメラ", "許可", "権限", "プライバシー"] },
   { matches: /(写真|画像|ビデオ).*(消した|消す|削除|捨て)/i, terms: ["写真", "削除", "最近削除した項目", "容量"] },
+  { matches: /(容量|空き容量|ストレージ).*(ない|不足|いっぱい|少な)|容量ない/i, terms: ["ストレージ", "空き容量", "容量不足", "いっぱい"] },
   { matches: /(音|サウンド|スピーカー).*(出ない|出な|聞こえ|鳴らない)/i, terms: ["音", "サウンド", "スピーカー", "出力"] },
   { matches: /(word|ワード).*(余白|マージン)|余白.*(word|ワード)/i, terms: ["Word", "余白", "レイアウト", "ページ設定"] },
 ];
@@ -96,7 +97,7 @@ export function searchSettings(
   const q = normalized.toLowerCase().trim();
   const detectedOS = osFilter || inferredOS(q);
   if (!q) return detectedOS ? settings.filter((s) => s.os === detectedOS) : settings;
-  const troubleshootingQuery = /(できない|つながらない|繋がらない|エラー|失敗|動かない|出ない|使えない|遅い|消えた|困る|不具合)/i.test(q);
+  const troubleshootingQuery = /(できない|つながらない|繋がらない|見つからない|表示されない|エラー|失敗|動かない|出ない|使えない|遅い|消えた|困る|不具合)/i.test(q);
 
   const tokens = buildTerms(q);
   if (!tokens.length && detectedOS) return settings.filter((s) => s.os === detectedOS);
@@ -136,8 +137,11 @@ export function searchSettings(
       // トラブル記事を先頭に出すと解決したい操作へ遠回りになる。
       if (s.category === "troubleshoot") score += troubleshootingQuery ? 4 : -35;
       if (!troubleshootingQuery && /(暗い|暗く|まぶしい)/i.test(q)) {
-        if (title.includes("明るさを変更")) score += 60;
-        if (title.includes("自動調整")) score -= 15;
+        if (title.includes("明るさを変更")) score += 100;
+        if (title.includes("自動調整")) score -= 60;
+      }
+      if (!troubleshootingQuery && /通知.*(うるさ|止|消|オフ)/i.test(q)) {
+        if (title.includes("通知をオフ") || aliases.some((alias) => alias.includes("通知を止"))) score += 70;
       }
       if (s.verified_at) score += 2;
       score += matched * 3;

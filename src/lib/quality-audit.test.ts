@@ -16,7 +16,6 @@ function makeSetting(overrides: Partial<Setting> = {}): Setting {
     aliases: ["通知"],
     path: ["設定", "システム", "通知"],
     steps: ["Windowsの設定アプリを開きます。", "通知を選び、アプリごとの表示方法や通知音を変更します。"],
-    related_slugs: [],
     keywords: ["通知設定"],
     description: "Windows 11で通知をアプリごとに変更し、不要な通知を減らす方法を説明します。",
     updated_at: "2026-08-01T00:00:00.000Z",
@@ -26,6 +25,8 @@ function makeSetting(overrides: Partial<Setting> = {}): Setting {
     source_url: "https://support.microsoft.com/example",
     impact: "通知の表示を必要なものだけに整理できます。",
     rollback: "同じ画面で元の通知設定に戻せます。",
+    if_missing: "設定内の検索で通知を探し、管理PCでは組織の制限を確認します。",
+    related_slugs: ["notification-troubleshooting"],
     ...overrides,
   };
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isOSType } from "@/lib/types";
 import { isRateLimited, requireSameOrigin } from "@/lib/request-security";
 import { serverSupabase } from "@/lib/server-supabase";
+import { normalizeDemandQuery } from "@/lib/search-demand";
 
 const attempts = new Map<string, { count: number; resetAt: number }>();
 const MAX_QUERY_LENGTH = 120;
@@ -32,21 +33,35 @@ export async function POST(request: NextRequest) {
   const resultCount = typeof values.resultCount === "number" ? values.resultCount : Number(values.resultCount);
   const os = typeof values.os === "string" && isOSType(values.os) ? values.os : null;
 
-  if (!query || !Number.isInteger(resultCount) || resultCount < 0 || resultCount > 50) {
+  if (!query || !Number.isInteger(resultCount) || resultCount < 0 || resultCount > 500) {
     return NextResponse.json({ ok: false, logged: false }, { status: 400 });
   }
 
-  // 現時点ではゼロヒットだけを保存し、運営コストと収集データを抑える。
-  if (resultCount !== 0 || !serverSupabase) {
+  if (!serverSupabase) {
     return NextResponse.json({ ok: true, logged: false }, { status: 202, headers: { "Cache-Control": "no-store" } });
   }
 
-  const { error } = await serverSupabase.from("search_logs").insert({
-    query,
-    normalized_query: query,
-    os,
-    result_count: 0,
+  const normalizedQuery = normalizeDemandQuery(query).slice(0, MAX_QUERY_LENGTH) || query;
+  // 新スキーマでは日次集計へupsertし、同じ検索を行単位で無期限保存しない。
+  // 移行前環境ではゼロヒットだけを従来テーブルへ保存する。
+  let { error } = await serverSupabase.rpc("record_search_query", {
+    input_query: query,
+    input_normalized_query: normalizedQuery,
+    input_os: os,
+    input_result_count: Math.min(50, resultCount),
   });
+  if (error && ["42883", "PGRST202"].includes(error.code || "")) {
+    if (resultCount === 0) {
+      ({ error } = await serverSupabase.from("search_logs").insert({
+        query,
+        normalized_query: normalizedQuery,
+        os,
+        result_count: 0,
+      }));
+    } else {
+      error = null;
+    }
+  }
 
   if (error && !["42P01", "PGRST205"].includes(error.code || "")) {
     // ログ保存の失敗で検索画面を壊さない。テーブル未作成時も公開機能は継続する。

@@ -12,6 +12,7 @@ const EMPTY: Omit<Setting, "id" | "updated_at"> = {
   description: "", screenshot_url: "",
   status: "draft", published_at: null, verified_at: null, editor_note: "",
   source_url: "", device_scope: "", impact: "", rollback: "", caution: "", if_missing: "", review_due_at: null,
+  index_status: "auto", content_type: null,
 };
 
 function parseLines(text: string): string[] {
@@ -21,12 +22,12 @@ function toLines(arr: string[]): string {
   return arr.join("\n");
 }
 
-type StepMedia = { image_url: string; image_alt: string };
+type StepMedia = { image_url: string; image_alt: string; image_captured_at?: string; image_platform_version?: string; image_device?: string };
 
 function stepMediaByIndex(steps: SettingStep[]): Record<number, StepMedia> {
   return Object.fromEntries(steps.map((step, index) => {
-    const { image_url, image_alt } = getStepImage(step);
-    return [index, { image_url: image_url || "", image_alt: image_alt || "" }];
+    const { image_url, image_alt, image_captured_at, image_platform_version, image_device } = getStepImage(step);
+    return [index, { image_url: image_url || "", image_alt: image_alt || "", image_captured_at, image_platform_version, image_device }];
   }));
 }
 
@@ -47,7 +48,8 @@ export function SettingEditorPage({
           status: setting.status || "published", published_at: setting.published_at || null,
           verified_at: setting.verified_at || null, editor_note: setting.editor_note || "", source_url: setting.source_url || "",
           device_scope: setting.device_scope || "", impact: setting.impact || "", rollback: setting.rollback || "",
-          caution: setting.caution || "", if_missing: setting.if_missing || "", review_due_at: setting.review_due_at || null }
+          caution: setting.caution || "", if_missing: setting.if_missing || "", review_due_at: setting.review_due_at || null,
+          index_status: setting.index_status || "auto", content_type: setting.content_type || null }
       : { ...EMPTY }
   );
   const [aliasText, setAliasText] = useState(toLines(setting?.aliases || []));
@@ -59,6 +61,7 @@ export function SettingEditorPage({
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState<"cover" | number | null>(null);
   const [revisions, setRevisions] = useState<SettingRevision[]>([]);
+  const [duplicateReviewed, setDuplicateReviewed] = useState(false);
 
   useEffect(() => {
     if (!setting?.id) return;
@@ -95,7 +98,10 @@ export function SettingEditorPage({
       } else {
         setStepMedia((current) => ({
           ...current,
-          [target]: { image_url: url, image_alt: current[target]?.image_alt || "" },
+          [target]: {
+            ...current[target], image_url: url, image_alt: current[target]?.image_alt || "",
+            image_captured_at: new Date().toISOString(), image_platform_version: form.version,
+          },
         }));
       }
     } catch (e) {
@@ -142,7 +148,10 @@ export function SettingEditorPage({
       steps: parseLines(stepsText).map((text, index) => {
         const media = stepMedia[index];
         return media?.image_url || media?.image_alt
-          ? { text, ...(media.image_url ? { image_url: media.image_url } : {}), ...(media.image_alt ? { image_alt: media.image_alt } : {}) }
+          ? { text, ...(media.image_url ? { image_url: media.image_url } : {}), ...(media.image_alt ? { image_alt: media.image_alt } : {}),
+              ...(media.image_captured_at ? { image_captured_at: media.image_captured_at } : {}),
+              ...(media.image_platform_version ? { image_platform_version: media.image_platform_version } : {}),
+              ...(media.image_device ? { image_device: media.image_device } : {}) }
           : text;
       }),
       keywords: parseLines(keywordsText),
@@ -153,10 +162,16 @@ export function SettingEditorPage({
       const res = await fetch("/api/settings", {
         method: isNew ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isNew ? payload : { id: setting!.id, ...payload }),
+        body: JSON.stringify(isNew ? { ...payload, duplicateReviewed } : { id: setting!.id, ...payload, duplicateReviewed }),
       });
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        const details = [
+          ...(Array.isArray(data.blocks) ? data.blocks.map((item: { message?: unknown }) => typeof item.message === "string" ? item.message : "") : []),
+          ...(Array.isArray(data.intentCollisions) ? data.intentCollisions.map((item: { title?: unknown }) => typeof item.title === "string" ? `類似意図: ${item.title}` : "") : []),
+        ].filter(Boolean);
+        throw new Error([data.error, ...details].join(" / "));
+      }
       router.push("/admin");
     } catch (e) {
       setError(String(e));
@@ -220,6 +235,27 @@ export function SettingEditorPage({
             <label style={label}>公開状態</label>
             <select style={inp} value={form.status || "published"} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "draft" | "published" }))}>
               <option value="published">公開</option><option value="draft">下書き</option>
+            </select>
+            {form.status === "published" && <label style={{ ...label, marginTop: 8, display: "flex", gap: 8, alignItems: "flex-start", fontWeight: 400 }}>
+              <input type="checkbox" checked={duplicateReviewed} onChange={(event) => setDuplicateReviewed(event.target.checked)} />
+              類似意図の候補を確認し、別名統合ではなく独立記事にする理由がある
+            </label>}
+          </div>
+          <div>
+            <label style={label}>インデックス状態</label>
+            <select style={inp} value={form.index_status || "auto"} onChange={(e) => setForm((f) => ({ ...f, index_status: e.target.value as Setting["index_status"] }))}>
+              <option value="auto">自動（品質基準に従う）</option>
+              <option value="index">index（品質基準を通過した場合）</option>
+              <option value="noindex">noindex（公開するが検索登録しない）</option>
+            </select>
+          </div>
+          <div>
+            <label style={label}>記事の意図</label>
+            <select style={inp} value={form.content_type || ""} onChange={(e) => setForm((f) => ({ ...f, content_type: e.target.value ? e.target.value as Setting["content_type"] : null }))}>
+              <option value="">自動判定</option>
+              <option value="setting">設定ガイド</option>
+              <option value="troubleshooting">トラブルシューティング</option>
+              <option value="error_code">エラーコード</option>
             </select>
           </div>
           <div>

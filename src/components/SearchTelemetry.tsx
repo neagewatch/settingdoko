@@ -23,11 +23,10 @@ export default function SearchTelemetry({
     reported.add(key);
     logSearch(cleanQuery, resultCount);
 
-    if (resultCount !== 0) return;
     void fetch("/api/search-log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: cleanQuery, resultCount, os: os || null }),
+      body: JSON.stringify({ query: cleanQuery, resultCount: Math.min(500, resultCount), os: os || null }),
       keepalive: true,
     }).catch(() => {});
   }, [query, resultCount, os]);

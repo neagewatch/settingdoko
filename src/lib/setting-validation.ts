@@ -60,10 +60,19 @@ function cleanSteps(value: unknown): SettingStep[] | null {
     if (item.image_url !== undefined && imageUrl === undefined) return null;
     const imageAlt = item.image_alt === undefined ? undefined : cleanText(item.image_alt, 300);
     if (item.image_alt !== undefined && !imageAlt) return null;
+    const imageCapturedAt = item.image_captured_at === undefined ? undefined : cleanTimestamp(item.image_captured_at);
+    if (item.image_captured_at !== undefined && imageCapturedAt === undefined) return null;
+    const imagePlatformVersion = item.image_platform_version === undefined ? undefined : cleanText(item.image_platform_version, 80);
+    if (item.image_platform_version !== undefined && !imagePlatformVersion) return null;
+    const imageDevice = item.image_device === undefined ? undefined : cleanText(item.image_device, 120);
+    if (item.image_device !== undefined && !imageDevice) return null;
     result.push({
       text,
       ...(imageUrl ? { image_url: imageUrl } : {}),
       ...(imageAlt ? { image_alt: imageAlt } : {}),
+      ...(imageCapturedAt ? { image_captured_at: imageCapturedAt } : {}),
+      ...(imagePlatformVersion ? { image_platform_version: imagePlatformVersion } : {}),
+      ...(imageDevice ? { image_device: imageDevice } : {}),
     });
   }
   return result;
@@ -97,6 +106,9 @@ export function parseSettingWriteInput(value: unknown): SettingWriteInput | null
   const sourceUrl = cleanUrl(value.source_url);
   if (value.screenshot_url !== undefined && screenshotUrl === undefined) return null;
   if (value.source_url !== undefined && sourceUrl === undefined) return null;
+  // 情報源はDB制約・公開判定と同じくHTTPSに限定する。HTTPを受け付けてから
+  // INSERT時に500へ化けると、管理画面が入力ミスを説明できないため、ここで弾く。
+  if (sourceUrl && !sourceUrl.startsWith("https://")) return null;
 
   const optionalText = (key: string, maxLength = MAX_TEXT) => {
     if (value[key] === undefined || value[key] === null || value[key] === "") return null;
@@ -107,6 +119,13 @@ export function parseSettingWriteInput(value: unknown): SettingWriteInput | null
   const publishedAt = cleanTimestamp(value.published_at);
   const reviewDueAt = cleanTimestamp(value.review_due_at);
   if (verifiedAt === undefined || publishedAt === undefined || reviewDueAt === undefined) return null;
+
+  const indexStatus = value.index_status === undefined ? undefined : value.index_status;
+  if (indexStatus !== undefined && indexStatus !== "auto" && indexStatus !== "index" && indexStatus !== "noindex") return null;
+  const contentType = value.content_type === undefined || value.content_type === null || value.content_type === "" ? undefined : value.content_type;
+  if (contentType !== undefined && contentType !== "setting" && contentType !== "troubleshooting" && contentType !== "error_code") return null;
+  const workflowStatus = value.workflow_status === undefined || value.workflow_status === null || value.workflow_status === "" ? undefined : value.workflow_status;
+  if (workflowStatus !== undefined && !["discovered", "candidate", "draft", "source_attached", "verified", "published", "archived"].includes(String(workflowStatus))) return null;
 
   return {
     title,
@@ -134,5 +153,8 @@ export function parseSettingWriteInput(value: unknown): SettingWriteInput | null
     caution: optionalText("caution", 1000),
     if_missing: optionalText("if_missing", 1200),
     review_due_at: reviewDueAt,
+    index_status: indexStatus,
+    content_type: contentType,
+    workflow_status: workflowStatus as SettingWriteInput["workflow_status"],
   };
 }

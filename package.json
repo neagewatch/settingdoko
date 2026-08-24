@@ -9,7 +9,12 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx",
-    "audit:data": "tsx scripts/audit-data.ts",
+    "prebuild": "npm run quality:ci",
+    "audit:data": "node --import tsx scripts/audit-data.ts",
+    "audit:content": "node --import tsx scripts/content-audit.ts",
+    "check:sources": "node --import tsx scripts/check-sources.ts",
+    "content:ops": "node --import tsx scripts/content-operations-report.ts",
+    "quality:ci": "npm run audit:data && npm run audit:content -- --strict",
     "audit:site": "node scripts/audit-site.mjs"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 export const revalidate = 60;
 
-import { getSettingsBySlug, getRelatedSettings, getSettingsByOS } from "@/lib/data";
+import { getSettingsBySlug, getRelatedSettings, getSettingsByOS, getStoredSourceHealth } from "@/lib/data";
 import { OSType, Setting, OS_LABELS, CATEGORIES, getStepImage, isOSType } from "@/lib/types";
 import PathTrail from "@/components/PathTrail";
 import OSTabs from "@/components/OSTabs";
@@ -17,7 +17,7 @@ import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { safeJsonLd } from "@/lib/structured-data";
 import { getArticleRiskLevel, isReviewOverdue, isSettingIndexable, sourceLabel, type ArticleRiskLevel } from "@/lib/content-quality";
-import { normalizeQuery } from "@/lib/search";
+import { rankContextualRelated } from "@/lib/content-operations";
 import Image from "next/image";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
@@ -37,10 +37,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const versionLabel = setting.version ? ` ${setting.version}` : "";
   const ogImageUrl = `${BASE_URL}/api/og?title=${encodeURIComponent(setting.title)}&os=${setting.os}&path=${encodeURIComponent(setting.path.join(" › "))}`;
   const description = `${setting.description} 対応：${OS_LABELS[setting.os]}${versionLabel}`.slice(0, 160);
+  const sourceHealth = await getStoredSourceHealth();
+  const health = setting.source_url ? sourceHealth.get(setting.source_url) : undefined;
+  const indexable = isSettingIndexable(setting) && health !== "broken" && health !== "invalid";
   return {
     title: `${setting.title}（${OS_LABELS[setting.os]}${versionLabel}）`,
     description,
-    robots: isSettingIndexable(setting) ? undefined : { index: false, follow: true },
+    robots: indexable ? undefined : { index: false, follow: true },
     openGraph: {
       title: `${setting.title} | 設定どこ？`,
       description: setting.description,
@@ -82,26 +85,7 @@ async function renderDetail(
   const prevSetting = currentIdx > 0 ? catSettings[currentIdx - 1] : null;
   const nextSetting = currentIdx < catSettings.length - 1 ? catSettings[currentIdx + 1] : null;
   const explicitlyRelated = await getRelatedSettings(setting.related_slugs, setting.id);
-  const relatedTerms = new Set(
-    [setting.title, ...setting.aliases, ...setting.keywords]
-      .flatMap((value) => normalizeQuery(value).split(/\s+/))
-      .filter((value) => value.length >= 2),
-  );
-  const contextualRelated = osSettings
-    .filter((item) => item.id !== setting.id && !explicitlyRelated.some((relatedItem) => relatedItem.id === item.id))
-    .map((item) => {
-      const candidateTerms = new Set(
-        [item.title, ...item.aliases, ...item.keywords]
-          .flatMap((value) => normalizeQuery(value).split(/\s+/))
-          .filter((value) => value.length >= 2),
-      );
-      const sharedTerms = [...relatedTerms].filter((term) => [...candidateTerms].some((candidate) => candidate.includes(term) || term.includes(candidate))).length;
-      const sameCategoryBonus = item.category === setting.category ? 3 : 0;
-      const problemBonus = item.category === "troubleshoot" || setting.category === "troubleshoot" ? 2 : 0;
-      return { item, score: sharedTerms * 10 + sameCategoryBonus + problemBonus };
-    })
-    .sort((left, right) => right.score - left.score || left.item.title.localeCompare(right.item.title, "ja"))
-    .map(({ item }) => item);
+  const contextualRelated = rankContextualRelated(setting, osSettings, new Set(explicitlyRelated.map((item) => item.id)));
   const related = [...explicitlyRelated, ...contextualRelated].slice(0, 5);
   const stepImages = setting.steps
     .map(getStepImage)

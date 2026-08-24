@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState } from "react";
-import { logView, markHelpful, isHelpful } from "@/lib/analytics";
+import { getFeedbackResult, getFeedbackToken, logView, markFeedback } from "@/lib/analytics";
 
 export function ViewTracker({ slug, os, title }: { slug: string; os: string; title: string }) {
   useEffect(() => {
@@ -13,30 +13,30 @@ export function ViewTracker({ slug, os, title }: { slug: string; os: string; tit
 }
 
 export function HelpfulButton({ settingId, initialCount = 0 }: { settingId: string; initialCount?: number }) {
-  const [done, setDone] = useState(false);
+  const [result, setResult] = useState<"helpful" | "not_helpful" | null>(null);
   const [mounted, setMounted] = useState(false);
   const [count, setCount] = useState(Math.max(0, initialCount));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setDone(isHelpful(settingId));
+    setResult(getFeedbackResult(settingId));
   }, [settingId]);
 
   if (!mounted) return null;
 
-  async function handleHelpful() {
-    if (done || saving) return;
+  async function handleFeedback(vote: "helpful" | "not_helpful") {
+    if (result || saving) return;
     // まず同じ端末で二重送信を防ぐ。サーバー保存に失敗しても記事閲覧は壊さない。
-    markHelpful(settingId);
-    setDone(true);
-    setCount((value) => value + 1);
+    markFeedback(settingId, vote);
+    setResult(vote);
+    if (vote === "helpful") setCount((value) => value + 1);
     setSaving(true);
     try {
       const response = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settingId, result: "helpful" }),
+        body: JSON.stringify({ settingId, result: vote, token: getFeedbackToken() }),
         keepalive: true,
       });
       const body = await response.json().catch(() => ({})) as { count?: unknown };
@@ -52,12 +52,13 @@ export function HelpfulButton({ settingId, initialCount = 0 }: { settingId: stri
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
       <span style={{ fontSize: 14, color: "var(--text-muted)" }}>この記事は役に立ちましたか？</span>
       <button
-        className={`helpful-btn ${done ? "done" : ""}`}
-        onClick={() => void handleHelpful()}
-        disabled={done}
+        className={`helpful-btn ${result ? "done" : ""}`}
+        onClick={() => void handleFeedback("helpful")}
+        disabled={Boolean(result)}
       >
-        {done ? "✓ 解決しました！" : "👍 解決した"}
+        {result === "helpful" ? "✓ 解決しました！" : result === "not_helpful" ? "回答済み" : "👍 解決した"}
       </button>
+      {!result && <button className="helpful-btn" onClick={() => void handleFeedback("not_helpful")} disabled={saving}>解決しなかった</button>}
       {count > 0 && <span aria-live="polite" style={{ fontSize: 12, color: "var(--text-muted)" }}>{count}人が役に立ったと回答</span>}
     </div>
   );

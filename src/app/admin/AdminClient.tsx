@@ -87,13 +87,21 @@ export default function AdminClient({ settings: initialSettings, contentRequests
     const ids = [...selectedIds];
     if (ids.length === 0) return;
     const label = status === "published" ? "公開" : "非公開（下書き）";
-    if (!confirm(`選択した${ids.length}件を${label}に変更しますか？`)) return;
     setBulkUpdating(true);
     try {
-      const response = await fetch("/api/admin/settings/bulk-status", {
+      const previewResponse = await fetch("/api/admin/settings/bulk-status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids, status }),
+      });
+      const preview = await previewResponse.json().catch(() => ({}));
+      if (!previewResponse.ok) throw new Error(preview.error || "公開状態を事前確認できませんでした");
+      if (!confirm(`事前確認: ${preview.wouldUpdate ?? ids.length}件を${label}に変更します。続けますか？`)) return;
+
+      const response = await fetch("/api/admin/settings/bulk-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, status, execute: true }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "公開状態を更新できませんでした");

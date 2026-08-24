@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverSupabase } from "@/lib/server-supabase";
 import { isRateLimited, requireSameOrigin } from "@/lib/request-security";
+import { createHash } from "node:crypto";
 
 // 一人の連続送信を抑える安全弁。正確な投票システムではなく、運営判断用の参考値。
 const attempts = new Map<string, { count: number; resetAt: number }>();
@@ -18,9 +19,29 @@ export async function POST(request: NextRequest) {
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false }, { status: 400 }); }
   const settingId = body && typeof body === "object" && "settingId" in body && typeof body.settingId === "string" ? body.settingId : "";
   const result = body && typeof body === "object" && "result" in body && typeof body.result === "string" ? body.result : "";
-  if (!UUID_PATTERN.test(settingId) || result !== "helpful") return NextResponse.json({ ok: false }, { status: 400 });
+  const token = body && typeof body === "object" && "token" in body && typeof body.token === "string" ? body.token : "";
+  if (!UUID_PATTERN.test(settingId) || !["helpful", "not_helpful"].includes(result) || !UUID_PATTERN.test(token)) return NextResponse.json({ ok: false }, { status: 400 });
 
   try {
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const recorded = await serverSupabase.rpc("record_setting_feedback", {
+      input_setting_id: settingId,
+      input_vote: result,
+      input_token_hash: tokenHash,
+    });
+    if (!recorded.error) {
+      const value = Array.isArray(recorded.data) ? recorded.data[0] : recorded.data;
+      return NextResponse.json({
+        ok: true,
+        count: Number(value?.helpful_count) || 0,
+        notHelpfulCount: Number(value?.not_helpful_count) || 0,
+        recorded: value?.recorded !== false,
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (!["42883", "PGRST202"].includes(recorded.error.code || "")) throw recorded.error;
+
+    // 移行SQL適用前の互換動作。否定票は不正な列を作らず、移行後から集計する。
+    if (result === "not_helpful") return NextResponse.json({ ok: true, recorded: false }, { status: 202, headers: { "Cache-Control": "no-store" } });
     const current = await serverSupabase
       .from("settings")
       .select("id,helpful_count")

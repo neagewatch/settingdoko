@@ -90,3 +90,19 @@ test("指定された条件付きタイトルだけを削除対象として判�
   assert.equal(isUnwantedConditionTitle("イヤホンが接続済みなのに音が出ない場合"), false);
   assert.equal(isUnwantedConditionTitle("Windows 11で通知をオフにする（Windows版）"), false);
 });
+
+test("オン・有効などの表現違いを検索意図候補として検出する", () => {
+  const left = { ...setting("wifi-on"), title: "Windows 11でWi-Fiをオンにする", category: "network", aliases: ["Wi-Fiをオン"] } as Setting;
+  const right = { ...setting("wifi-enable"), title: "Windows 11でWi-Fiを有効にする", category: "network", aliases: ["Wi-Fiを有効"], path: ["クイック設定", "Wi-Fi"], steps: ["クイック設定を開く", "Wi-Fiボタンを有効にする"], source_url: "https://support.microsoft.com/wifi-enable" } as Setting;
+  const groups = detectDuplicateGroups([left, right]);
+  assert.equal(groups.length, 1);
+  assert.ok(groups[0].reasons.includes("same-intent"));
+  assert.equal(isStrongDuplicateGroup(groups[0]), false);
+});
+
+test("異なるエラーコードをタイトル類似だけで重複扱いしない", () => {
+  const left = { ...setting("error-1"), title: "Windows 11でエラーコード0x80070001が出るときの対処", steps: ["コード1固有の原因を確認する", "公式手順1を実行する"] } as Setting;
+  const right = { ...setting("error-2"), title: "Windows 11でエラーコード0x80070002が出るときの対処", steps: ["コード2固有の原因を確認する", "公式手順2を実行する"] } as Setting;
+  const groups = detectDuplicateGroups([left, right]);
+  assert.equal(groups.some((group) => group.reasons.includes("similar-title")), false);
+});

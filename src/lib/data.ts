@@ -19,12 +19,14 @@ export interface ServerZeroHitSearch { query: string; os: string | null; count: 
 export interface SettingPageResult { items: Setting[]; total: number; }
 export type OSCategoryCounts = Record<string, number>;
 export interface PublishedStats { total: number; byPlatform: Record<string, number>; }
+export type StoredSourceHealthStatus = "ok" | "redirect" | "broken" | "blocked" | "invalid";
 
-const PUBLIC_COLUMNS = "id,title,slug,os,version,category,aliases,path,steps,related_slugs,keywords,description,updated_at,view_count,helpful_count,difficulty,estimate_minutes,screenshot_url,status,published_at,verified_at,source_url,device_scope,impact,rollback,caution,if_missing,review_due_at";
+const PUBLIC_COLUMNS = "id,title,slug,os,version,category,aliases,path,steps,related_slugs,keywords,description,updated_at,view_count,helpful_count,difficulty,estimate_minutes,screenshot_url,status,published_at,verified_at,source_url,device_scope,impact,rollback,caution,if_missing,review_due_at,index_status,content_type,source_type,verified_on_version,verified_from,verified_to,requires_reverification";
 // 新しい任意項目のSQLをまだ実行していない環境でも、既存の公開ページを止めない。
-const LEGACY_PUBLIC_COLUMNS = PUBLIC_COLUMNS.replace(",if_missing", "");
+// 旧DBに存在しない列は一括で外して再試行し、公開ページは従来列だけで継続する。
+const LEGACY_PUBLIC_COLUMNS = "id,title,slug,os,version,category,aliases,path,steps,related_slugs,keywords,description,updated_at,view_count,helpful_count,difficulty,estimate_minutes,screenshot_url,status,published_at,verified_at,source_url,device_scope,impact,rollback,caution,review_due_at";
 const SEARCH_COLUMNS = "id,title,slug,os,version,category,aliases,path,keywords,description,updated_at,status,verified_at";
-const ADMIN_COLUMNS = `${PUBLIC_COLUMNS},editor_note`;
+const ADMIN_COLUMNS = `${PUBLIC_COLUMNS},not_helpful_count,workflow_status,editor_note`;
 const LEGACY_ADMIN_COLUMNS = `${LEGACY_PUBLIC_COLUMNS},editor_note`;
 const FALLBACK_UPDATED_AT = "2026-08-01T00:00:00.000Z";
 
@@ -41,6 +43,7 @@ let publicSettingsRequest: Promise<Setting[]> | null = null;
 let publicSearchCache: { data: Setting[]; expiresAt: number } | null = null;
 let publicSearchRequest: Promise<Setting[]> | null = null;
 let publishedStatsCache: { data: PublishedStats; expiresAt: number } | null = null;
+let sourceHealthCache: { data: Map<string, StoredSourceHealthStatus>; expiresAt: number } | null = null;
 const categoryPageCache = new Map<string, { data: SettingPageResult; expiresAt: number }>();
 const osCategoryCountsCache = new Map<string, { data: OSCategoryCounts; expiresAt: number }>();
 
@@ -76,14 +79,18 @@ function normalizeSteps(value: unknown): SettingStep[] {
     if (typeof item === "string") return item.trim() ? [item] : [];
     if (!item || typeof item !== "object" || !("text" in item)) return [];
 
-    const { text, image_url, image_alt } = item as {
-      text?: unknown; image_url?: unknown; image_alt?: unknown;
+    const { text, image_url, image_alt, image_captured_at, image_platform_version, image_device } = item as {
+      text?: unknown; image_url?: unknown; image_alt?: unknown; image_captured_at?: unknown;
+      image_platform_version?: unknown; image_device?: unknown;
     };
     if (typeof text !== "string" || !text.trim()) return [];
     return [{
       text,
       ...(typeof image_url === "string" && image_url ? { image_url } : {}),
       ...(typeof image_alt === "string" && image_alt ? { image_alt } : {}),
+      ...(typeof image_captured_at === "string" && image_captured_at ? { image_captured_at } : {}),
+      ...(typeof image_platform_version === "string" && image_platform_version ? { image_platform_version } : {}),
+      ...(typeof image_device === "string" && image_device ? { image_device } : {}),
     }];
   });
 }
@@ -120,17 +127,27 @@ function logReadFailure(operation: string, error: unknown) {
   console.error(`[data:${operation}] Supabase read failed`, error);
 }
 
-function isMissingIfMissingColumn(error: unknown): boolean {
+function isMissingOptionalColumn(error: unknown): boolean {
   const candidate = error as { code?: unknown; message?: unknown } | null;
   const code = typeof candidate?.code === "string" ? candidate.code : "";
   const message = typeof candidate?.message === "string" ? candidate.message : String(error || "");
-  return /if_missing/i.test(message) && (code === "42703" || code.startsWith("PGRST") || /column/i.test(message));
+  const knownColumn = /(?:if_missing|index_status|content_type|source_type|verified_on_version|verified_from|verified_to|requires_reverification|not_helpful_count|workflow_status)/i.test(message);
+  return knownColumn && (code === "42703" || code.startsWith("PGRST") || /column/i.test(message));
 }
 
-function withoutIfMissing<T extends Record<string, unknown>>(payload: T): Omit<T, "if_missing"> {
+function withoutLegacyOptionalColumns<T extends Record<string, unknown>>(payload: T): T {
   const copy = { ...payload } as T & { if_missing?: unknown };
   delete copy.if_missing;
-  return copy as Omit<T, "if_missing">;
+  delete (copy as T & Record<string, unknown>).index_status;
+  delete (copy as T & Record<string, unknown>).content_type;
+  delete (copy as T & Record<string, unknown>).source_type;
+  delete (copy as T & Record<string, unknown>).verified_on_version;
+  delete (copy as T & Record<string, unknown>).verified_from;
+  delete (copy as T & Record<string, unknown>).verified_to;
+  delete (copy as T & Record<string, unknown>).requires_reverification;
+  delete (copy as T & Record<string, unknown>).not_helpful_count;
+  delete (copy as T & Record<string, unknown>).workflow_status;
+  return copy;
 }
 
 async function fetchSettingsPages(
@@ -169,7 +186,7 @@ async function fetchSettingsPagesCompatible(
   try {
     return await fetchSettingsPages(client, columns, status);
   } catch (error) {
-    if (!columns.includes("if_missing") || !isMissingIfMissingColumn(error)) throw error;
+    if (!isMissingOptionalColumn(error)) throw error;
     return fetchSettingsPages(client, columns === ADMIN_COLUMNS ? LEGACY_ADMIN_COLUMNS : LEGACY_PUBLIC_COLUMNS, status);
   }
 }
@@ -191,7 +208,7 @@ async function fetchPublicPage(client: SupabaseClient, options: PublicPageOption
   }
 
   let result = await run(PUBLIC_COLUMNS);
-  if (result.error && isMissingIfMissingColumn(result.error)) result = await run(LEGACY_PUBLIC_COLUMNS);
+  if (result.error && isMissingOptionalColumn(result.error)) result = await run(LEGACY_PUBLIC_COLUMNS);
   if (result.error) throw result.error;
   return { data: (result.data || []) as unknown[], count: result.count ?? null };
 }
@@ -258,8 +275,23 @@ export function clearPublicSettingsCache() {
   publicSettingsCache = null;
   publicSearchCache = null;
   publishedStatsCache = null;
+  sourceHealthCache = null;
   categoryPageCache.clear();
   osCategoryCountsCache.clear();
+}
+
+export async function getStoredSourceHealth(): Promise<Map<string, StoredSourceHealthStatus>> {
+  if (sourceHealthCache && sourceHealthCache.expiresAt > Date.now()) return sourceHealthCache.data;
+  if (!serverSupabase) return new Map();
+  const result = await serverSupabase.from("source_checks").select("source_url,status");
+  if (result.error) return new Map();
+  const health = new Map<string, StoredSourceHealthStatus>();
+  for (const row of result.data || []) {
+    if (typeof row.source_url !== "string" || !["ok", "redirect", "broken", "blocked", "invalid"].includes(row.status)) continue;
+    health.set(row.source_url, row.status as StoredSourceHealthStatus);
+  }
+  sourceHealthCache = { data: health, expiresAt: Date.now() + PUBLIC_CACHE_TTL_MS };
+  return health;
 }
 
 export async function getPublishedStats(): Promise<PublishedStats> {
@@ -305,7 +337,12 @@ export async function getAllSettings(includeDrafts = false): Promise<Setting[]> 
   if (includeDrafts) {
     if (!serverSupabase) throw new DataAccessError("管理用データベース接続が設定されていません");
     try {
-      return await fetchSettingsPagesCompatible(serverSupabase, ADMIN_COLUMNS);
+      const settings = await fetchSettingsPagesCompatible(serverSupabase, ADMIN_COLUMNS);
+      // 運用移行前のDBでも全記事取得を止めない。列があれば否定票を再検証優先度へ反映する。
+      const feedbackCounts = await serverSupabase.from("settings").select("id,not_helpful_count");
+      if (feedbackCounts.error) return settings;
+      const byId = new Map((feedbackCounts.data || []).map((row) => [row.id, Number(row.not_helpful_count) || 0]));
+      return settings.map((setting) => ({ ...setting, not_helpful_count: byId.get(setting.id) || 0 }));
     } catch (error) {
       throw new DataAccessError(error instanceof Error ? error.message : "管理用データを取得できませんでした");
     }
@@ -475,8 +512,8 @@ export async function createSetting(data: SettingWriteInput): Promise<Setting | 
   const inserted = await serverSupabase.from("settings").insert([payload]).select(ADMIN_COLUMNS).single();
   result = inserted.data as Setting | null;
   error = inserted.error;
-  if (error && isMissingIfMissingColumn(error)) {
-    const legacyPayload = withoutIfMissing(payload);
+  if (error && isMissingOptionalColumn(error)) {
+    const legacyPayload = withoutLegacyOptionalColumns(payload);
     const legacyInserted = await serverSupabase.from("settings").insert([legacyPayload]).select(LEGACY_ADMIN_COLUMNS).single();
     result = legacyInserted.data as Setting | null;
     error = legacyInserted.error;
@@ -489,7 +526,7 @@ export async function createSetting(data: SettingWriteInput): Promise<Setting | 
 export async function updateSetting(id: string, data: Partial<SettingWriteInput>): Promise<Setting | null> {
   if (!serverSupabase) throw new DataAccessError("管理用データベース接続が設定されていません");
   let previousResult = await serverSupabase.from("settings").select(ADMIN_COLUMNS).eq("id", id).single();
-  if (previousResult.error && isMissingIfMissingColumn(previousResult.error)) {
+  if (previousResult.error && isMissingOptionalColumn(previousResult.error)) {
     previousResult = await serverSupabase.from("settings").select(LEGACY_ADMIN_COLUMNS).eq("id", id).single();
   }
   const { data: previous } = previousResult;
@@ -499,8 +536,8 @@ export async function updateSetting(id: string, data: Partial<SettingWriteInput>
     ...(data.status === "published" && !data.published_at ? { published_at: new Date().toISOString() } : {}),
   };
   let updated = await serverSupabase.from("settings").update(payload).eq("id", id).select(ADMIN_COLUMNS).single();
-  if (updated.error && isMissingIfMissingColumn(updated.error)) {
-    const legacyPayload = withoutIfMissing(payload);
+  if (updated.error && isMissingOptionalColumn(updated.error)) {
+    const legacyPayload = withoutLegacyOptionalColumns(payload);
     updated = await serverSupabase.from("settings").update(legacyPayload).eq("id", id).select(LEGACY_ADMIN_COLUMNS).single();
   }
   const { data: result, error } = updated;
@@ -519,7 +556,7 @@ export async function deleteSetting(id: string): Promise<void> {
 export async function getSettingById(id: string): Promise<Setting | null> {
   if (!serverSupabase) return null;
   let response = await serverSupabase.from("settings").select(ADMIN_COLUMNS).eq("id", id).single();
-  if (response.error && isMissingIfMissingColumn(response.error)) {
+  if (response.error && isMissingOptionalColumn(response.error)) {
     response = await serverSupabase.from("settings").select(LEGACY_ADMIN_COLUMNS).eq("id", id).single();
   }
   const { data, error } = response;
@@ -545,6 +582,31 @@ export async function getContentReports(): Promise<ContentReport[]> {
 
 export async function getServerZeroHitSearches(limit = 10): Promise<ServerZeroHitSearch[]> {
   if (!serverSupabase) return [];
+  const aggregate = await serverSupabase
+    .from("search_query_daily")
+    .select("sample_query,normalized_query,os,zero_hits,day")
+    .gt("zero_hits", 0)
+    .order("day", { ascending: false })
+    .limit(2000);
+  if (!aggregate.error && aggregate.data) {
+    const grouped = new Map<string, ServerZeroHitSearch>();
+    for (const row of aggregate.data as Array<{ sample_query?: unknown; normalized_query?: unknown; os?: unknown; zero_hits?: unknown; day?: unknown }>) {
+      if (typeof row.sample_query !== "string" || typeof row.day !== "string") continue;
+      const normalized = typeof row.normalized_query === "string" ? row.normalized_query : row.sample_query;
+      const os = typeof row.os === "string" && isOSType(row.os) ? row.os : null;
+      const key = `${normalized}\u0000${os || ""}`;
+      const count = Math.max(0, Number(row.zero_hits) || 0);
+      const current = grouped.get(key);
+      if (current) {
+        current.count += count;
+        if (row.day > current.last_seen_at) current.last_seen_at = row.day;
+      } else grouped.set(key, { query: row.sample_query, os, count, last_seen_at: row.day });
+    }
+    return [...grouped.values()]
+      .sort((a, b) => b.count - a.count || b.last_seen_at.localeCompare(a.last_seen_at))
+      .slice(0, Math.max(1, Math.min(50, limit)));
+  }
+
   const { data, error } = await serverSupabase
     .from("search_logs")
     .select("query,normalized_query,os,created_at")

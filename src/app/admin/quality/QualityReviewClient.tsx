@@ -5,13 +5,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CATEGORIES, OS_LABELS } from "@/lib/types";
-import type { QualityItem, QualityPriority } from "@/lib/quality-audit";
+import type { QualityIssue, QualityItem, QualityPriority } from "@/lib/quality-audit";
 
 type QualityResponse = {
   totalArticles: number;
   totalIssues: number;
   counts: Record<QualityPriority, number>;
   items: QualityItem[];
+  inventory: {
+    published: number; draft: number; verified: number; sourceBacked: number;
+    indexable: number; noindex: number; unverified: number; orphanGuides: number;
+    explicitOrphanGuides: number; guidesWithoutRelated: number; guidesWithoutExplicitRelated: number;
+    dynamicRelatedEdges: number; brokenSourceCandidates: number; duplicateCandidates: number;
+  };
 };
 
 type PriorityFilter = "actionable" | "all" | QualityPriority;
@@ -48,6 +54,10 @@ export default function QualityReviewClient() {
   const [priority, setPriority] = useState<PriorityFilter>("actionable");
   const [filterOS, setFilterOS] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterQuality, setFilterQuality] = useState("");
+  const [filterIssue, setFilterIssue] = useState("");
+  const [filterIndex, setFilterIndex] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -81,9 +91,13 @@ export default function QualityReviewClient() {
       (priority === "all" || (priority === "actionable" ? item.priority !== "low" : item.priority === priority)) &&
       (!filterOS || item.os === filterOS) &&
       (!filterStatus || item.status === filterStatus) &&
+      (!filterCategory || item.category === filterCategory) &&
+      (!filterQuality || item.qualityStatus === filterQuality) &&
+      (!filterIssue || item.issueCodes.includes(filterIssue as QualityIssue)) &&
+      (!filterIndex || (filterIndex === "index" ? item.indexable : !item.indexable)) &&
       (!normalizedQuery || item.title.toLocaleLowerCase("ja-JP").includes(normalizedQuery) || item.slug.toLocaleLowerCase("ja-JP").includes(normalizedQuery)),
     );
-  }, [data, filterOS, filterStatus, priority, query]);
+  }, [data, filterCategory, filterIndex, filterIssue, filterOS, filterQuality, filterStatus, priority, query]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visibleItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -105,6 +119,7 @@ export default function QualityReviewClient() {
             </p>
           </div>
           <button type="button" onClick={() => void loadQuality(true)} disabled={refreshing} style={{ marginLeft: "auto", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-secondary)", cursor: refreshing ? "wait" : "pointer", fontSize: 12, fontWeight: 600 }}>{refreshing ? "確認中…" : "↻ 再確認"}</button>
+          <a href="/api/admin/quality?format=csv" style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", color: "var(--primary)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>CSV出力</a>
         </div>
         <p style={{ margin: "14px 0 0", padding: "10px 12px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, color: "#1E40AF", fontSize: 12, lineHeight: 1.7 }}>
           自動判定は修正候補を探すためのものです。短い記事でも正しい場合があるため、内容を確認してから編集してください。画像の有無は品質低下とは判定していません。
@@ -116,6 +131,15 @@ export default function QualityReviewClient() {
           })}
           <span style={{ padding: "6px 10px", color: "var(--text-muted)", fontSize: 12 }}>候補合計 {data?.totalIssues ?? 0}件</span>
         </div>
+        {data?.inventory && <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12, color: "var(--text-secondary)", fontSize: 12 }}>
+          <span>公開 {data.inventory.published}</span><span>下書き {data.inventory.draft}</span>
+          <span>検証済み {data.inventory.verified}</span><span>情報源あり {data.inventory.sourceBacked}</span>
+          <span>index {data.inventory.indexable}</span><span>noindex {data.inventory.noindex}</span>
+          <span>描画後孤立 {data.inventory.orphanGuides}</span><span>明示リンク孤立 {data.inventory.explicitOrphanGuides}</span>
+          <span>描画後関連なし {data.inventory.guidesWithoutRelated}</span><span>明示relatedなし {data.inventory.guidesWithoutExplicitRelated}</span>
+          <span>動的関連リンク {data.inventory.dynamicRelatedEdges}</span><span>未検証 {data.inventory.unverified}</span>
+          <span>情報源切れ候補 {data.inventory.brokenSourceCandidates}</span><span>類似候補 {data.inventory.duplicateCandidates}</span>
+        </div>}
         {error && <p role="alert" style={{ margin: "14px 0 0", padding: "10px 12px", borderRadius: 8, background: "#FEF2F2", border: "1px solid #FECACA", color: "#991B1B", fontSize: 13 }}>{error}</p>}
       </div>
 
@@ -138,6 +162,28 @@ export default function QualityReviewClient() {
             <option value="published">公開のみ</option>
             <option value="draft">下書きのみ</option>
           </select>
+          <select style={inputStyle} value={filterCategory} onChange={(event) => { setFilterCategory(event.target.value); setPage(1); }}>
+            <option value="">カテゴリ：すべて</option>
+            {Object.entries(CATEGORIES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+          <select style={inputStyle} value={filterQuality} onChange={(event) => { setFilterQuality(event.target.value); setPage(1); }}>
+            <option value="">品質状態：すべて</option>
+            {["VERIFIED", "NEEDS_VERIFICATION", "INCOMPLETE", "DUPLICATE_CANDIDATE", "OUTDATED", "BROKEN_SOURCE", "LOW_VALUE", "MISSING_STEPS", "UNSAFE_TO_PUBLISH"].map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+          <select style={inputStyle} value={filterIssue} onChange={(event) => { setFilterIssue(event.target.value); setPage(1); }}>
+            <option value="">不足項目：すべて</option>
+            <option value="missing-source">情報源なし</option><option value="invalid-source">URL形式不正</option><option value="unknown-source">情報源区分不明</option><option value="generic-source">一般トップページ</option>
+            <option value="unverified">検証日なし</option><option value="future-verification">検証日が未来</option>
+            <option value="broken-source">情報源切れ</option><option value="source-redirect">情報源移転</option>
+            <option value="review-overdue">再検証期限超過</option><option value="missing-if-missing">if_missingなし</option>
+            <option value="missing-related">関連なし</option><option value="missing-impact">影響なし</option>
+            <option value="missing-rollback">戻し方なし</option><option value="missing-version">対応版なし</option><option value="missing-path">設定場所なし</option><option value="missing-steps">手順なし</option>
+            <option value="missing-search-terms">検索語不足</option><option value="boilerplate-content">定型文</option><option value="placeholder-text">プレースホルダー</option>
+            <option value="risk-without-caution">注意書きなし</option>
+          </select>
+          <select style={inputStyle} value={filterIndex} onChange={(event) => { setFilterIndex(event.target.value); setPage(1); }}>
+            <option value="">index状態：すべて</option><option value="index">indexのみ</option><option value="noindex">noindexのみ</option>
+          </select>
           <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 12 }}>{filtered.length}件表示 / 候補{data?.totalIssues ?? 0}件</span>
         </div>
       </div>
@@ -154,7 +200,7 @@ export default function QualityReviewClient() {
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ padding: "3px 8px", borderRadius: 999, background: colors.background, color: colors.color, border: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700 }}>{priorityLabel(item.priority)}</span>
                     <strong style={{ fontSize: 14 }}>{item.title || "（タイトル未入力）"}</strong>
-                    <span style={{ color: "var(--text-muted)", fontSize: 12 }}>品質スコア {item.score}/100</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: 12 }}>完全性 {item.score}/100・{item.qualityStatus}・{item.indexable ? "index" : "noindex"}</span>
                   </div>
                   <div style={{ marginTop: 4, color: "var(--text-muted)", fontSize: 11, wordBreak: "break-all" }}>{item.slug}</div>
                 </div>
@@ -169,6 +215,7 @@ export default function QualityReviewClient() {
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginTop: 10, color: "var(--text-muted)", fontSize: 11 }}>
                 <span>{metricsLabel(item)}</span>
+                <span>推奨: {item.recommendedAction}</span>
                 <span>更新 {new Date(item.updated_at).toLocaleDateString("ja-JP")}</span>
                 <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
                   <Link href={`/admin/settings/${item.id}`} style={{ color: "var(--primary)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>編集</Link>

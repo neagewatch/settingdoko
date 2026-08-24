@@ -33,10 +33,10 @@ type Candidate = Omit<Setting, "id" | "updated_at">;
 type ImportScope = "all" | "troubleshoot" | "troubleshootUnique";
 type ImportMode = "new" | "draft";
 
-// 本番DBには旧来の「slugだけ」の一意制約が残っているため、
-// 同期判定もDBの最も厳しい制約に合わせてslug単位で行う。
-function key(item: Pick<Candidate, "slug">) {
-  return item.slug;
+// 現行DB制約と公開URLの識別単位はslug×OS。
+// slugだけで判定すると、同じ目的のOS別候補が無言で欠落する。
+function key(item: Pick<Candidate, "slug" | "os">) {
+  return `${item.slug}\u0000${item.os}`;
 }
 
 function chunks<T>(items: T[], size: number): T[][] {
