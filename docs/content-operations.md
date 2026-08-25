@@ -14,6 +14,8 @@
 
 1つの設定先・1つの解決意図には、原則として1つの正規ガイドを置く。「Wi-Fiをオン」「Wi-Fiを有効」のような表現違いは別ページにせず、`aliases` と `keywords` に持たせる。症状と設定操作は別意図なので、SETTING GUIDE と TROUBLESHOOTING GUIDE は分ける。
 
+同一OS・カテゴリ・対象版・記事種別の意図重複は、候補のうち1件を安定した正規候補として選び、残りをindex対象から外す。旧URLの統合・alias書き込みは `intent-review.csv` を確認してから行い、OS違い・版違い・トラブル対設定は自動統合しない。
+
 新規記事の前に以下を確認する。
 
 1. `npm run audit:content` の検索意図候補
@@ -25,7 +27,9 @@
 
 公開には、有効なOS・カテゴリ・slug、対象バージョン、最短経路、実行可能な複数手順、権威あるHTTPS情報源、未来日でない検証日が必要である。危険な変更には注意、戻せる変更には原状復帰、設定項目が移動・非表示になり得るガイドには `if_missing` を付ける。
 
-完全性は100点満点の固定チェックリストで、タイトル8、識別子8、バージョン7、概要8、経路8、手順16、情報源12、検証日10、検索語6、戻し方5、見つからない場合5、関連4、適用範囲3である。点数だけで公開しない。`UNSAFE_TO_PUBLISH`、`MISSING_STEPS`、`LOW_VALUE` は公開を止める。
+完全性は100点満点の固定チェックリストで、タイトル8、識別子8、バージョン7、概要8、経路8、手順16、情報源12、検証日10、検索語6、戻し方5、見つからない場合5、関連4、適用範囲3を基準にする。戻し方と「項目がない場合」は記事種別・危険度・UI差から `required / optional / not_applicable` を決定し、該当しない項目を減点しない。点数だけで公開しない。`UNSAFE_TO_PUBLISH`、`MISSING_STEPS`、`LOW_VALUE` は公開を止める。
+
+公開記事がnoindexの場合は、`getGuideNoindexReasons` が `missing_source`、`source_broken`、`missing_verification`、`duplicate_intent`、`weak_content` などの理由コードを必ず付ける。理由が空のnoindexは監査エラーとして扱う。1〜2個の低リスク項目だけが不足する記事は `near-indexable.csv` と `repair-batch.csv` に入り、検索需要・閲覧数・情報源の有無で優先順位を付ける。
 
 ## 情報源と再検証
 
@@ -51,11 +55,27 @@ npm run audit:content -- --input /path/to/settings.json --json /tmp/content-audi
 npm run check:sources -- --input /path/to/settings.json --out /tmp/source-health.json
 npm run audit:content -- --input /path/to/settings.json --source-health /tmp/source-health.json
 npm run content:ops -- --input /path/to/settings.json --source-health /tmp/source-health.json --out-dir /tmp/settingdoko-operations
+npm run audit:production-state
+npm run audit:search-demand
+npm run export:production -- --out /tmp/settingdoko-production-settings.json --health-out /tmp/settingdoko-production-source-health.json
+npm run audit:inventory-diff -- --production /path/to/published.json
+npm run audit:sitemap -- --input /path/to/published.json --source-health /tmp/source-health.json --sitemap /path/to/sitemap.xml
+npm run content:repair -- --input /tmp/settingdoko-production-settings.json --source-health /tmp/settingdoko-production-source-health.json --limit 100
 ```
 
 管理者は `/api/admin/quality?format=csv` から編集レビューCSV、`/api/admin/search-demand?format=csv` から取得バックログを出力できる。どちらも管理認証が必要で公開キャッシュしない。
 
-`content:ops` は本文・公開状態を変更せず、`source-repair.csv`、`editorial-review.csv`、`quality-issues.csv`、`reverification-queue.csv`、`duplicate-review.json`、`acquisition-backlog.csv`、`coverage-matrix.csv`を出力する。情報源ヘルスを渡した場合は、確認済み結果だけを登録する `source-checks.sql` と、記事を削除・非公開化せず `requires_reverification` を立てる `reverification-flags.sql` も出力する。SQLはバックアップ確認と移行SQL適用後に内容を確認してから、管理者が手動実行する。
+`content:ops` は本文・公開状態を変更せず、`source-repair.csv`、`safe-source-repairs.csv`、`near-indexable.csv`、`repair-batch.csv`、`noindex-reasons.csv`、`related-link-repairs.csv`、`related-link-cleanup.csv`、`editorial-review.csv`、`quality-issues.csv`、`reverification-queue.csv`、`duplicate-review.json`、`intent-review.csv`、`intent-alias-consolidation.csv`、`acquisition-backlog.csv`、`coverage-matrix.csv`を出力する。同一公式ホスト内の個別資料への恒久リダイレクトだけを `safe-source-repairs.sql` に出し、情報源が一般トップへ移った場合は自動更新しない。canonical slugの決定的な関連リンク置換だけを `related-link-repairs.sql` に出す。置換先を推測できないリンクは `related-link-cleanup.sql` で削除候補として分離する。別名追加後に重複候補を公開維持+noindexへするSQLは `intent-alias-noindex.sql` として別出力する。どのSQLも自動適用しない。
+
+`content:repair` は、公式HTTPS情報源と検証日があり、情報源ヘルスも正常で、noindex理由が既知の定型文だけである記事を最大100件選ぶ。既存タイトル・最初の具体的な手順から概要を作り直し、明らかな製品名の重複だけを修正する。情報源、検証日、index_status、公開状態は変更しない。下書き候補の文言が残る記事は自動修正対象から除外する。実行後に生成される `quality-repairs.sql` は、元のタイトル・概要が一致する場合だけ更新するため、SQLエディターで内容を確認してから適用する。
+
+`audit:sitemap` は記事スナップショット・`source_checks`・取得済みsitemapを同じ公開判定で比較し、古いsitemapに残るnoindex URL、未掲載のindexable URL、重複URLを出力する。キャッシュ更新前の本番XMLを入力した場合も、除外URLを個別に確認できる。
+
+`export:production` はservice roleで`settings`と`source_checks`を読み取るだけのコマンドである。キーは標準出力・ファイルへ書き出さず、取得JSONはローカルの監査用に限定する。Migration未適用でも旧列へfallbackするため、適用前後の差分確認に使える。
+
+`audit:search-demand` はservice roleで`search_query_daily`と`search_logs`の件数・集計値だけを読み取る。検索語、IP、ユーザー識別子は出力しない。日次集計が存在しても行数が0の場合は、実際の検索イベントを1件発生させてから再確認し、ログAPI・RPC・権限を切り分ける。
+
+本番移行は、バックアップ/PITR確認後に `supabase-upgrade-operations.sql`、次に `content:ops` が出力した `source-checks.sql`、最後に `reverification-flags.sql` の順で実行する。`npm run audit:production-state` はservice roleを必要とし、列・テーブルの存在だけを確認する（秘密値は表示しない）。未適用・部分適用のまま記事を一括更新しない。
 
 リンク監査の `orphanGuides` / `guidesWithoutRelated` は、記事ページが実際に生成する文脈関連リンクを含む。`explicitOrphanGuides` / `guidesWithoutExplicitRelated` はDBの `related_slugs` だけを対象にした保守指標であり、保存データの不足と描画後の孤立を混同しない。
 

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { assessSource } from "../src/lib/source-quality";
-import type { SourceHealth } from "../src/lib/content-operations";
+import type { SourceHealth, SourceStatusClass } from "../src/lib/content-operations";
 
 type Options = { input: string; out?: string; sql?: string; limit: number; concurrency: number; timeout: number };
 
@@ -27,6 +27,20 @@ function sourceUrls(value: unknown): string[] {
     const url = (item as { source_url?: unknown }).source_url;
     return typeof url === "string" && url ? [url] : [];
   }))];
+}
+
+function statusClass(result: SourceHealth): SourceStatusClass {
+  const initial = assessSource(result.sourceUrl);
+  const final = result.finalUrl ? assessSource(result.finalUrl) : undefined;
+  if (initial.generic || final?.generic) return "GENERIC_HOME";
+  if (result.status === "redirect") {
+    if (!final?.secure || !final.authoritative) return "WRONG_DOCUMENT";
+    return "VALID_REDIRECT";
+  }
+  if (result.status === "broken" || result.status === "invalid") return "BROKEN";
+  if (result.status === "blocked") return "BLOCKED";
+  if (result.status === "ok") return "OK";
+  return "UNKNOWN";
 }
 
 async function request(url: string, method: "HEAD" | "GET", timeout: number): Promise<Response> {
@@ -131,11 +145,17 @@ async function main() {
   }
 
   await Promise.all(Array.from({ length: Math.min(options.concurrency, urls.length) }, () => worker()));
-  if (options.out) fs.writeFileSync(options.out, JSON.stringify(results, null, 2) + "\n");
+  const enrichedResults = results.map((result) => ({ ...result, statusClass: statusClass(result) }));
+  if (options.out) fs.writeFileSync(options.out, JSON.stringify(enrichedResults, null, 2) + "\n");
   if (options.sql) fs.writeFileSync(options.sql, sourceChecksSql(results));
   const counts: Record<string, number> = {};
-  for (const result of results) counts[result.status] = (counts[result.status] || 0) + 1;
-  console.log(JSON.stringify({ uniqueSources: urls.length, counts }, null, 2));
+  const classCounts: Record<string, number> = {};
+  for (const result of results) {
+    counts[result.status] = (counts[result.status] || 0) + 1;
+    const label = statusClass(result);
+    classCounts[label] = (classCounts[label] || 0) + 1;
+  }
+  console.log(JSON.stringify({ uniqueSources: urls.length, counts, classCounts }, null, 2));
 }
 
 void main().catch((error) => {

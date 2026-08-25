@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import { buildContentInventory, buildReverificationQueue, editorialReviewRows, inferContentType, type SourceHealth } from "../src/lib/content-operations";
-import { detectDuplicateGroups, detectSearchIntentCandidates } from "../src/lib/duplicate-detection";
+import { detectDuplicateGroups, detectSearchIntentCandidates, isStrongDuplicateGroup, selectIntentAliasConsolidation } from "../src/lib/duplicate-detection";
 import { getSettingIndexingIssues } from "../src/lib/content-quality";
 import { analyzeSearchDemand, toAcquisitionBacklog, type SearchLogRecord } from "../src/lib/search-demand";
 import { assessSource } from "../src/lib/source-quality";
+import { publicationStateViolations } from "../src/lib/publication-policy";
 import { CATEGORIES, getStepText, isOSType, type Setting } from "../src/lib/types";
 import { loadLocalCandidateSettings } from "./candidate-dataset";
 
@@ -95,8 +96,15 @@ if (Array.isArray(sourceHealthRows)) {
 
 const duplicateGroups = detectDuplicateGroups(settings);
 const intentGroups = detectSearchIntentCandidates(settings);
-const duplicateIds = new Set(duplicateGroups.flatMap((group) => group.items.map((item) => item.id)));
-const { inventory, evaluations } = buildContentInventory(settings, { duplicateIds, sourceHealth });
+const strongDuplicateGroups = duplicateGroups.filter((group) => isStrongDuplicateGroup(group));
+const duplicateIds = new Set(strongDuplicateGroups.flatMap((group) => group.items.map((item) => item.id)));
+const intentDuplicateIds = new Set(intentGroups.flatMap((group) => group.items.map((item) => item.id)));
+const intentAlias = selectIntentAliasConsolidation(settings, intentGroups);
+const { inventory, evaluations } = buildContentInventory(settings, { duplicateIds, aliasDuplicateIds: intentAlias.aliasDuplicateIds, intentDuplicateIds, sourceHealth });
+const publicationStateIssues = settings.flatMap((setting) => publicationStateViolations(setting, {
+  sourceHealth: setting.source_url ? sourceHealth.get(setting.source_url) : undefined,
+  duplicate: duplicateIds.has(setting.id) || intentAlias.aliasDuplicateIds.has(setting.id),
+}));
 const reverificationQueue = buildReverificationQueue(settings, sourceHealth);
 const indexingIssueCounts: Record<string, number> = {};
 const indexingIssueCombinations: Record<string, number> = {};
@@ -123,6 +131,7 @@ for (const setting of settings) {
 }
 const suspiciousBodyGroups = [...bodyGroups.values()].filter((items) => items.length >= 3);
 const sourceUrls = settings.map((item) => item.source_url).filter((item): item is string => Boolean(item));
+const sourceUrlSet = new Set(sourceUrls);
 const sourceAssessments = sourceUrls.map(assessSource);
 const unverifiedEvaluations = evaluations.filter((item) => {
   const setting = settings.find((candidate) => candidate.id === item.id)!;
@@ -131,6 +140,8 @@ const unverifiedEvaluations = evaluations.filter((item) => {
 
 const errors: string[] = [];
 const warnings: string[] = [];
+if (inventory.noindexWithoutReason > 0) errors.push(`noindex理由なし: ${inventory.noindexWithoutReason}件`);
+if (publicationStateIssues.length) errors.push(`公開状態の矛盾: ${publicationStateIssues.length}件`);
 for (const group of duplicateSlugGroups) errors.push(`重複slug×OS: ${group[0].slug} / ${group[0].os}`);
 for (const setting of settings) {
   const label = `${setting.os}/${setting.slug}`;
@@ -166,7 +177,10 @@ const report = {
     duplicateSlugGroups: duplicateSlugGroups.length,
     candidateGroups: duplicateGroups.length,
     candidateGuides: duplicateIds.size,
-    strongGroups: duplicateGroups.filter((group) => group.confidence === "high").length,
+    strongGroups: strongDuplicateGroups.length,
+    aliasConsolidationGroups: intentAlias.aliasGroups.length,
+    safeAliasConsolidationGroups: intentAlias.safeAliasGroups.length,
+    aliasConsolidationGuides: intentAlias.aliasDuplicateIds.size,
     searchIntentGroups: intentGroups.length,
     suspiciousIdenticalBodyGroups: suspiciousBodyGroups.length,
     suspiciousIdenticalBodyGuides: new Set(suspiciousBodyGroups.flatMap((group) => group.map((item) => item.id))).size,
@@ -184,7 +198,9 @@ const report = {
     generic: sourceAssessments.filter((item) => item.generic).length,
     unknown: sourceAssessments.filter((item) => item.type === "UNKNOWN").length,
     insecure: sourceAssessments.filter((item) => !item.secure).length,
-    healthChecked: sourceHealth.size,
+    // source_checksはURL移転後も履歴を保持するため、使用中URLと残存履歴を分けて表示する。
+    healthChecked: [...sourceHealth.keys()].filter((url) => sourceUrlSet.has(url)).length,
+    staleHealthRows: [...sourceHealth.keys()].filter((url) => !sourceUrlSet.has(url)).length,
     healthCounts: groupCounts([...sourceHealth.values()], (item) => item.status),
   },
   coverage: {
@@ -195,6 +211,7 @@ const report = {
     review: reverificationQueue.filter((item) => item.status === "REVIEW").length,
     top: reverificationQueue.slice(0, 100),
   },
+  publicationStateIssues,
   demand: {
     clusters: demandClusters.length,
     zeroResultClusters: demandClusters.filter((item) => item.zeroResultCount > 0).length,
@@ -214,6 +231,7 @@ console.log(`全記事: ${inventory.total}`);
 console.log(`公開: ${inventory.published} / 下書き: ${inventory.draft}`);
 console.log(`検証日あり: ${inventory.verified} / 情報源あり: ${inventory.sourceBacked}`);
 console.log(`indexable: ${inventory.indexable} / noindex: ${inventory.noindex}`);
+console.log(`noindex理由なし: ${inventory.noindexWithoutReason} / near-indexable: ${inventory.nearIndexable}`);
 console.log(`未検証または情報源なし: ${inventory.unverified}`);
 console.log(`類似候補: ${duplicateGroups.length}グループ・${duplicateIds.size}記事 / 検索意図候補: ${intentGroups.length}グループ`);
 console.log(`孤立記事: ${inventory.orphanGuides} / 関連なし: ${inventory.guidesWithoutRelated} / 関連リンク切れ: ${inventory.invalidRelatedLinks}`);

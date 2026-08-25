@@ -60,6 +60,9 @@ export function getSettingIndexingIssues(setting: Setting, now = Date.now()): st
 
   if (!isOSType(setting.os)) issues.push("unsupported-platform");
   if (!CATEGORIES[setting.category]) issues.push("unknown-category");
+  if (!setting.version.trim()) issues.push("missing-version");
+  if (setting.os === "android" && !setting.device_scope?.trim()) issues.push("missing-device-scope");
+  if (setting.workflow_status && !["verified", "published"].includes(setting.workflow_status)) issues.push("workflow-not-published");
   // 概要だけの文字数ではなく、実行可能な手順を含む本文全体で薄さを判定する。
   // 旧40文字条件は、具体的な5手順がある記事まで大量に除外していた。
   if (description.length < 24 || description.length + stepCharacters < 90) issues.push("thin-description");

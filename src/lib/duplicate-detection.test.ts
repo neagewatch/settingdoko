@@ -6,6 +6,7 @@ import {
   isLegacyTroubleshootingSlug,
   isStrongDuplicateGroup,
   isUnwantedConditionTitle,
+  selectIntentAliasConsolidation,
 } from "./duplicate-detection";
 import type { Setting } from "./types";
 
@@ -98,6 +99,16 @@ test("オン・有効などの表現違いを検索意図候補として検出�
   assert.equal(groups.length, 1);
   assert.ok(groups[0].reasons.includes("same-intent"));
   assert.equal(isStrongDuplicateGroup(groups[0]), false);
+});
+
+test("同一版・同一意図は正規記事1件と別名統合候補へ分ける", () => {
+  const left = { ...setting("wifi-on"), title: "Windows 11でWi-Fiをオンにする", category: "network" } as Setting;
+  const right = { ...setting("wifi-enable"), title: "Windows 11でWi-Fiを有効にする", category: "network", source_url: "https://support.microsoft.com/wifi", path: left.path } as Setting;
+  left.source_url = "https://support.microsoft.com/wifi";
+  const result = selectIntentAliasConsolidation([left, right]);
+  assert.equal(result.aliasGroups.length, 1);
+  assert.equal(result.aliasDuplicateIds.size, 1);
+  assert.ok(result.canonicalByDuplicateId.has("wifi-enable") || result.canonicalByDuplicateId.has("wifi-on"));
 });
 
 test("異なるエラーコードをタイトル類似だけで重複扱いしない", () => {

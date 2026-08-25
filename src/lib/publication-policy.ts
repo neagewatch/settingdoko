@@ -1,8 +1,14 @@
 import { evaluateGuide } from "./content-operations";
+import type { SourceHealth } from "./content-operations";
 import { canonicalIntentKey } from "./duplicate-detection";
 import type { Setting, SettingWriteInput } from "./types";
 
 export type PublicationBlock = { code: string; message: string };
+
+export type PublicationStateViolation = {
+  code: "DRAFT_INDEXABLE" | "UNSAFE_INDEXABLE" | "BROKEN_SOURCE_VERIFIED" | "DUPLICATE_INDEXABLE" | "WORKFLOW_INDEXABLE";
+  message: string;
+};
 
 function asSetting(input: SettingWriteInput, id = "publication-candidate"): Setting {
   return {
@@ -44,4 +50,33 @@ export function intentCollisions(input: SettingWriteInput | Setting, existing: S
   const intent = canonicalIntentKey(setting);
   if (!intent) return [];
   return existing.filter((candidate) => candidate.id !== currentId && canonicalIntentKey(candidate) === intent);
+}
+
+/** 保存済みの公開状態と決定論的品質判定の矛盾を、書き込み前に検出する。 */
+export function publicationStateViolations(
+  input: SettingWriteInput | Setting,
+  options: { sourceHealth?: SourceHealth; duplicate?: boolean; conflicting?: boolean } = {},
+): PublicationStateViolation[] {
+  const setting = "id" in input ? input : asSetting(input);
+  const evaluation = evaluateGuide(setting, {
+    sourceHealth: setting.source_url && options.sourceHealth ? new Map([[setting.source_url, options.sourceHealth]]) : undefined,
+    duplicateIds: options.duplicate ? new Set([setting.id]) : undefined,
+    conflictingIds: options.conflicting ? new Set([setting.id]) : undefined,
+  });
+  const requestedIndex = setting.index_status === "index" || (setting.index_status !== "noindex" && evaluation.indexable);
+  const violations: PublicationStateViolation[] = [];
+  if (setting.status === "draft" && requestedIndex) violations.push({ code: "DRAFT_INDEXABLE", message: "下書きはindex対象にできません" });
+  if (evaluation.statuses.includes("UNSAFE_TO_PUBLISH") && requestedIndex) violations.push({ code: "UNSAFE_INDEXABLE", message: "安全性に問題がある記事をindex対象にできません" });
+  const sourceHealthInvalid = options.sourceHealth && (
+    ["broken", "invalid", "blocked"].includes(options.sourceHealth.status)
+    || ["BROKEN", "BLOCKED", "GENERIC_HOME", "WRONG_DOCUMENT"].includes(options.sourceHealth.statusClass || "")
+  );
+  // noindexの記事は過去の検証日を履歴として保持したまま、再検証キューで扱える。
+  // 矛盾としてブロックするのは、健全性を確認できない情報源を現在index指定している場合だけ。
+  if (sourceHealthInvalid && setting.verified_at && requestedIndex) {
+    violations.push({ code: "BROKEN_SOURCE_VERIFIED", message: "健全性を確認できない情報源をindex対象にせず、再検証キューへ送ります" });
+  }
+  if ((options.duplicate || evaluation.statuses.includes("DUPLICATE_CANDIDATE")) && requestedIndex) violations.push({ code: "DUPLICATE_INDEXABLE", message: "重複候補は正規記事の確定までindex対象にできません" });
+  if (setting.workflow_status && !["verified", "published"].includes(setting.workflow_status) && requestedIndex) violations.push({ code: "WORKFLOW_INDEXABLE", message: "検証・公開前のワークフロー状態をindex対象にできません" });
+  return violations;
 }

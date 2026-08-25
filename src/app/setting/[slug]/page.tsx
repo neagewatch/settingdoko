@@ -13,11 +13,12 @@ import StepChecklist from "@/components/StepChecklist";
 import { CopyStepsButton } from "@/components/Utilities";
 import ReportButton from "@/components/ReportButton";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { safeJsonLd } from "@/lib/structured-data";
 import { getArticleRiskLevel, isReviewOverdue, isSettingIndexable, sourceLabel, type ArticleRiskLevel } from "@/lib/content-quality";
-import { rankContextualRelated } from "@/lib/content-operations";
+import { rankContextualRelated, sourceHealthBlocksIndex } from "@/lib/content-operations";
+import { canonicalSlug } from "@/lib/duplicate-detection";
 import Image from "next/image";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
@@ -31,7 +32,9 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const { slug } = await params;
   const { os } = await searchParams;
   if (os && !isOSType(os)) return { title: "設定が見つかりません", robots: "noindex" };
-  const allOS = await getSettingsBySlug(slug);
+  let allOS = await getSettingsBySlug(slug);
+  const legacySlug = canonicalSlug(slug);
+  if (!allOS.length && legacySlug !== slug) allOS = await getSettingsBySlug(legacySlug);
   const setting = os ? allOS.find((item) => item.os === os) : allOS.find((item) => item.os === "windows11") || allOS[0];
   if (!setting) return { title: "設定が見つかりません" };
   const versionLabel = setting.version ? ` ${setting.version}` : "";
@@ -39,7 +42,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const description = `${setting.description} 対応：${OS_LABELS[setting.os]}${versionLabel}`.slice(0, 160);
   const sourceHealth = await getStoredSourceHealth();
   const health = setting.source_url ? sourceHealth.get(setting.source_url) : undefined;
-  const indexable = isSettingIndexable(setting) && health !== "broken" && health !== "invalid";
+  const indexable = isSettingIndexable(setting) && !sourceHealthBlocksIndex(health);
   return {
     title: `${setting.title}（${OS_LABELS[setting.os]}${versionLabel}）`,
     description,
@@ -57,7 +60,14 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 export default async function SettingDetailPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const { os } = await searchParams;
-  const allOS = await getSettingsBySlug(slug);
+  let allOS = await getSettingsBySlug(slug);
+  const legacySlug = canonicalSlug(slug);
+  if (!allOS.length && legacySlug !== slug) {
+    const canonicalSettings = await getSettingsBySlug(legacySlug);
+    const target = os ? canonicalSettings.find((item) => item.os === os) : canonicalSettings[0];
+    if (target) permanentRedirect(`/setting/${target.slug}?os=${target.os}`);
+    allOS = canonicalSettings;
+  }
   if (os && !isOSType(os)) notFound();
   const setting = os
     ? allOS.find((item) => item.os === os) || null

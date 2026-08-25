@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildContentInventory, evaluateGuide } from "./content-operations";
+import { buildContentInventory, buildReverificationQueue, evaluateGuide } from "./content-operations";
 import type { Setting } from "./types";
 
 function guide(overrides: Partial<Setting> = {}): Setting {
@@ -34,6 +34,8 @@ test("完全な公式情報付きガイドをVERIFIEDに分類する", () => {
   assert.equal(result.qualityStatus, "VERIFIED");
   assert.equal(result.completeness, 100);
   assert.equal(result.indexable, true);
+  assert.equal(result.requiresIfMissing, false);
+  assert.equal(result.factors.find((factor) => factor.key === "if-missing")?.applicability, "not_applicable");
 });
 
 test("未検証記事を公開可能と誤分類しない", () => {
@@ -46,6 +48,42 @@ test("明示noindexは公開を維持したままindex対象から外す", () =>
   const result = evaluateGuide(guide({ index_status: "noindex" }), { now: Date.parse("2026-08-23T00:00:00.000Z") });
   assert.equal(result.indexable, false);
   assert.ok(result.indexingIssues.includes("explicit-noindex"));
+});
+
+test("ブロックされた情報源は検証日があってもindex対象にしない", () => {
+  const result = evaluateGuide(guide(), {
+    now: Date.parse("2026-08-23T00:00:00.000Z"),
+    sourceHealth: new Map([[guide().source_url!, {
+      sourceUrl: guide().source_url!,
+      status: "blocked",
+    }]]),
+  });
+  assert.equal(result.indexable, false);
+  assert.ok(result.noindexReasons.includes("source_blocked"));
+});
+
+test("移転先が公式の個別資料でない情報源はindex対象にしない", () => {
+  const current = guide();
+  const result = evaluateGuide(current, {
+    now: Date.parse("2026-08-23T00:00:00.000Z"),
+    sourceHealth: new Map([[current.source_url!, {
+      sourceUrl: current.source_url!,
+      status: "redirect",
+      finalUrl: "https://example.com/",
+    }]]),
+  });
+  assert.equal(result.indexable, false);
+  assert.ok(result.noindexReasons.includes("source_broken"));
+});
+
+test("情報源切れは閲覧数に関係なく再検証の高優先キューへ入る", () => {
+  const current = guide({ view_count: 0 });
+  const queue = buildReverificationQueue([current], new Map([[current.source_url!, {
+    sourceUrl: current.source_url!,
+    status: "broken",
+  }]]), Date.parse("2026-08-23T00:00:00.000Z"));
+  assert.equal(queue[0].status, "HIGH_PRIORITY_REVIEW");
+  assert.ok(queue[0].reasons.includes("情報源切れ"));
 });
 
 test("記事種別の明示指定を自動判定より優先する", () => {

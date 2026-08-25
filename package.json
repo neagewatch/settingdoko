@@ -14,6 +14,12 @@
     "audit:content": "node --import tsx scripts/content-audit.ts",
     "check:sources": "node --import tsx scripts/check-sources.ts",
     "content:ops": "node --import tsx scripts/content-operations-report.ts",
+    "content:repair": "node --import tsx scripts/generate-quality-repairs.ts",
+    "audit:production-state": "node --import tsx scripts/verify-production-state.ts",
+    "audit:search-demand": "node --import tsx scripts/audit-production-search-demand.ts",
+    "audit:inventory-diff": "node --import tsx scripts/inventory-diff.ts",
+    "audit:sitemap": "node --import tsx scripts/audit-sitemap.ts",
+    "export:production": "node --import tsx scripts/export-production-inventory.ts",
     "quality:ci": "npm run audit:data && npm run audit:content -- --strict",
     "audit:site": "node scripts/audit-site.mjs"
   },

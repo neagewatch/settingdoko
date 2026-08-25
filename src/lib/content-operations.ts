@@ -18,14 +18,52 @@ export type QualityStatus =
   | "UNSAFE_TO_PUBLISH";
 
 export type SourceHealthStatus = "ok" | "redirect" | "broken" | "blocked" | "invalid" | "unchecked";
+export type SourceStatusClass = "OK" | "VALID_REDIRECT" | "BROKEN" | "BLOCKED" | "GENERIC_HOME" | "WRONG_DOCUMENT" | "UNKNOWN";
+
+export type FieldApplicability = "required" | "optional" | "not_applicable";
+
+export type NoindexReasonCode =
+  | "draft"
+  | "workflow_not_published"
+  | "missing_source"
+  | "source_broken"
+  | "source_blocked"
+  | "source_generic"
+  | "missing_verification"
+  | "missing_version"
+  | "missing_steps"
+  | "missing_path"
+  | "missing_scope"
+  | "duplicate_intent"
+  | "conflicting_instructions"
+  | "weak_content"
+  | "outdated"
+  | "unsafe_to_publish"
+  | "invalid_metadata"
+  | "explicit_noindex"
+  | "other";
 
 export type SourceHealth = {
   sourceUrl: string;
   status: SourceHealthStatus;
+  statusClass?: SourceStatusClass;
   httpStatus?: number;
   finalUrl?: string;
   checkedAt?: string;
 };
+
+/** 検証結果があっても、参照先の健全性が確認できない場合は公開判定を止める。 */
+export function sourceHealthBlocksIndex(health: SourceHealth | undefined): boolean {
+  if (!health) return false;
+  if (["broken", "invalid", "blocked"].includes(health.status)) return true;
+  if (["BROKEN", "BLOCKED", "GENERIC_HOME", "WRONG_DOCUMENT"].includes(health.statusClass || "")) return true;
+  if (health.status === "redirect") {
+    if (!health.finalUrl) return true;
+    const final = assessSource(health.finalUrl);
+    return !final.secure || !final.authoritative || final.generic;
+  }
+  return false;
+}
 
 export type CompletenessFactor = {
   key: string;
@@ -33,6 +71,7 @@ export type CompletenessFactor = {
   earned: number;
   possible: number;
   requiredForPublication: boolean;
+  applicability: FieldApplicability;
 };
 
 export type GuideEvaluation = {
@@ -52,6 +91,7 @@ export type GuideEvaluation = {
   recommendedAction: string;
   requiresUndo: boolean;
   requiresIfMissing: boolean;
+  noindexReasons: NoindexReasonCode[];
 };
 
 export type InventoryDimension = {
@@ -82,9 +122,15 @@ export type ContentInventory = {
   dynamicRelatedEdges: number;
   invalidRelatedLinks: number;
   guidesWithoutIfMissing: number;
+  ifMissingRequired: number;
+  ifMissingPresent: number;
+  ifMissingNotApplicable: number;
   reviewOverdue: number;
   duplicateCandidates: number;
   brokenSourceCandidates: number;
+  nearIndexable: number;
+  noindexReasonCounts: Record<NoindexReasonCode, number>;
+  noindexWithoutReason: number;
   statusCounts: Record<QualityStatus, number>;
   sourceTypeCounts: Record<SourceType, number>;
   byOS: Record<string, InventoryDimension>;
@@ -182,12 +228,39 @@ function needsUndo(setting: Setting, contentType: ContentType): boolean {
   return MUTATION_PATTERN.test(`${setting.title} ${setting.steps.map(getStepText).join(" ")}`);
 }
 
+const IF_MISSING_CATEGORY = new Set([
+  "network", "bluetooth", "display", "sound", "storage", "accessibility", "account", "privacy", "battery", "app",
+]);
+const IF_MISSING_VARIATION_PATTERN = /(表示されない|見つからない|見当たらない|項目がない|項目が見つからない|場所が異なる|場所が違う|名称が異なる|管理者|組織|会社|学校|メーカー|機種|端末|地域|利用できない|変更できない)/;
+
+/**
+ * 「項目がない場合」の案内は全記事の定型必須項目ではない。
+ * UI差・管理ポリシー・端末差が実際に起きやすい種別だけを決定論的に必須とする。
+ */
 function needsIfMissing(setting: Setting, contentType: ContentType): boolean {
-  return setting.path.length > 0 && contentType !== "ERROR_CODE_GUIDE";
+  if (contentType === "ERROR_CODE_GUIDE" || setting.path.length === 0) return false;
+  if (contentType === "TROUBLESHOOTING_GUIDE" || IF_MISSING_CATEGORY.has(setting.category)) return true;
+  const text = [setting.title, setting.description, ...setting.path, ...setting.steps.map(getStepText), setting.device_scope || ""].join(" ");
+  return IF_MISSING_VARIATION_PATTERN.test(text);
 }
 
-function factor(key: string, label: string, earned: number, possible: number, requiredForPublication = false): CompletenessFactor {
-  return { key, label, earned: Math.max(0, Math.min(possible, earned)), possible, requiredForPublication };
+function factor(
+  key: string,
+  label: string,
+  earned: number,
+  possible: number,
+  requiredForPublication = false,
+  applicability: FieldApplicability = requiredForPublication ? "required" : "optional",
+): CompletenessFactor {
+  const effectivePossible = applicability === "not_applicable" ? 0 : possible;
+  return {
+    key,
+    label,
+    earned: Math.max(0, Math.min(effectivePossible, earned)),
+    possible: effectivePossible,
+    requiredForPublication: applicability === "required" || requiredForPublication,
+    applicability,
+  };
 }
 
 export function completenessFactors(setting: Setting): CompletenessFactor[] {
@@ -213,10 +286,10 @@ export function completenessFactors(setting: Setting): CompletenessFactor[] {
     factor("source", "情報源", source.secure && source.authoritative && !source.generic ? 12 : source.secure && source.type !== "INVALID" ? 7 : 0, 12, true),
     factor("verified", "検証日", verifiedAt !== null && verifiedAt <= Date.now() + 86_400_000 ? 10 : 0, 10, true),
     factor("search", "検索別名・キーワード", searchTerms.length >= 4 ? 6 : searchTerms.length >= 2 ? 4 : searchTerms.length ? 2 : 0, 6),
-    factor("undo", "元に戻す方法", !undoRequired || Boolean(setting.rollback?.trim()) ? 5 : 0, 5),
-    factor("if-missing", "項目がない場合", !ifMissingRequired || Boolean(setting.if_missing?.trim()) ? 5 : 0, 5),
+    factor("undo", "元に戻す方法", !undoRequired || Boolean(setting.rollback?.trim()) ? 5 : 0, 5, false, undoRequired ? "required" : "not_applicable"),
+    factor("if-missing", "項目がない場合", !ifMissingRequired || Boolean(setting.if_missing?.trim()) ? 5 : 0, 5, false, ifMissingRequired ? "required" : "not_applicable"),
     factor("related", "関連ガイド", setting.related_slugs.length > 0 ? 4 : 0, 4),
-    factor("scope", "適用範囲", hasScope ? 3 : 0, 3),
+    factor("scope", "適用範囲", hasScope ? 3 : 0, 3, false, setting.os === "android" ? "required" : "optional"),
   ];
 }
 
@@ -242,13 +315,18 @@ export function evaluateGuide(
   options: {
     now?: number;
     duplicateIds?: ReadonlySet<string>;
+    aliasDuplicateIds?: ReadonlySet<string>;
+    intentDuplicateIds?: ReadonlySet<string>;
     conflictingIds?: ReadonlySet<string>;
     sourceHealth?: ReadonlyMap<string, SourceHealth>;
   } = {},
 ): GuideEvaluation {
   const now = options.now ?? Date.now();
   const factors = completenessFactors(setting);
-  const completeness = factors.reduce((sum, item) => sum + item.earned, 0);
+  const applicablePoints = factors.reduce((sum, item) => sum + item.possible, 0);
+  const completeness = applicablePoints > 0
+    ? Math.round((factors.reduce((sum, item) => sum + item.earned, 0) / applicablePoints) * 100)
+    : 0;
   const contentType = inferContentType(setting);
   const source = assessSource(setting.source_url);
   const verifiedAt = validDate(setting.verified_at);
@@ -269,9 +347,9 @@ export function evaluateGuide(
   if (unsafe) statuses.push("UNSAFE_TO_PUBLISH");
   if (setting.steps.length < 2 || stepCharacters < 45 || setting.path.length === 0) statuses.push("MISSING_STEPS");
   if (!setting.version.trim()) statuses.push("MISSING_VERSION");
-  if (options.duplicateIds?.has(setting.id)) statuses.push("DUPLICATE_CANDIDATE");
+  if (options.duplicateIds?.has(setting.id) || options.aliasDuplicateIds?.has(setting.id)) statuses.push("DUPLICATE_CANDIDATE");
   if (options.conflictingIds?.has(setting.id)) statuses.push("CONFLICTING");
-  if (sourceHealth?.status === "broken" || sourceHealth?.status === "invalid") statuses.push("BROKEN_SOURCE");
+  if (sourceHealthBlocksIndex(sourceHealth)) statuses.push("BROKEN_SOURCE");
   if ((reviewDueAt !== null && reviewDueAt < now) || (verifiedAt !== null && verifiedAt < now - 548 * 86_400_000)) statuses.push("OUTDATED");
   if (hasBoilerplateContent(setting)) statuses.push("LOW_VALUE");
   if (completeness < 70) statuses.push("INCOMPLETE");
@@ -284,6 +362,14 @@ export function evaluateGuide(
   ];
   statuses.sort((left, right) => statusOrder.indexOf(left) - statusOrder.indexOf(right));
   const qualityStatus = statuses[0];
+
+  const indexingIssues = getSettingIndexingIssues(setting, now);
+  const noindexReasons = getGuideNoindexReasons(setting, {
+    statuses,
+    indexingIssues,
+    sourceHealth,
+    duplicate: options.duplicateIds?.has(setting.id) || options.aliasDuplicateIds?.has(setting.id) || options.intentDuplicateIds?.has(setting.id) || false,
+  });
 
   return {
     id: setting.id,
@@ -299,13 +385,104 @@ export function evaluateGuide(
     factors,
     indexable: setting.status !== "draft"
       && isSettingIndexable(setting, now)
-      && sourceHealth?.status !== "broken"
-      && sourceHealth?.status !== "invalid",
-    indexingIssues: getSettingIndexingIssues(setting, now),
+      && (!setting.workflow_status || setting.workflow_status === "verified" || setting.workflow_status === "published")
+      && !options.duplicateIds?.has(setting.id)
+      && !options.aliasDuplicateIds?.has(setting.id)
+      && !options.conflictingIds?.has(setting.id)
+      && !sourceHealthBlocksIndex(sourceHealth),
+    indexingIssues,
     recommendedAction: recommendedAction(qualityStatus),
     requiresUndo: needsUndo(setting, contentType),
     requiresIfMissing: needsIfMissing(setting, contentType),
+    noindexReasons,
   };
+}
+
+function pushReason(reasons: NoindexReasonCode[], reason: NoindexReasonCode) {
+  if (!reasons.includes(reason)) reasons.push(reason);
+}
+
+/** 記事ごとのnoindex理由を、運用キューで扱える安定したコードへ変換する。 */
+export function getGuideNoindexReasons(
+  setting: Setting,
+  context: {
+    statuses?: QualityStatus[];
+    indexingIssues?: string[];
+    sourceHealth?: SourceHealth;
+    duplicate?: boolean;
+  } = {},
+): NoindexReasonCode[] {
+  const reasons: NoindexReasonCode[] = [];
+  const statuses = context.statuses || [];
+  const issues = context.indexingIssues || getSettingIndexingIssues(setting);
+  const health = context.sourceHealth;
+  if (setting.status === "draft") pushReason(reasons, "draft");
+  if (setting.workflow_status && !["verified", "published"].includes(setting.workflow_status)) pushReason(reasons, "workflow_not_published");
+  if (!setting.source_url) pushReason(reasons, "missing_source");
+  if (health?.status === "blocked" || health?.statusClass === "BLOCKED") pushReason(reasons, "source_blocked");
+  if (health && health.status !== "blocked" && sourceHealthBlocksIndex(health)) {
+    pushReason(reasons, "source_broken");
+  }
+  if (issues.includes("generic-source")) pushReason(reasons, "source_generic");
+  if (!setting.verified_at) pushReason(reasons, "missing_verification");
+  if (!setting.version.trim()) pushReason(reasons, "missing_version");
+  if (issues.includes("thin-steps") || statuses.includes("MISSING_STEPS")) pushReason(reasons, "missing_steps");
+  if (!setting.path.length) pushReason(reasons, "missing_path");
+  if (issues.includes("missing-device-scope")) pushReason(reasons, "missing_scope");
+  if (context.duplicate || statuses.includes("DUPLICATE_CANDIDATE")) pushReason(reasons, "duplicate_intent");
+  if (statuses.includes("CONFLICTING")) pushReason(reasons, "conflicting_instructions");
+  if (issues.includes("thin-description") || issues.includes("boilerplate") || statuses.includes("LOW_VALUE") || statuses.includes("INCOMPLETE")) pushReason(reasons, "weak_content");
+  if (issues.includes("review-overdue") || statuses.includes("OUTDATED")) pushReason(reasons, "outdated");
+  if (statuses.includes("UNSAFE_TO_PUBLISH") || issues.includes("missing-required-caution")) pushReason(reasons, "unsafe_to_publish");
+  if (issues.includes("explicit-noindex")) pushReason(reasons, "explicit_noindex");
+  if (issues.some((issue) => ["unsupported-platform", "unknown-category"].includes(issue))) pushReason(reasons, "invalid_metadata");
+  if (!reasons.length && setting.status !== "draft") pushReason(reasons, "other");
+  return reasons;
+}
+
+export type NearIndexableItem = {
+  id: string;
+  slug: string;
+  title: string;
+  os: Setting["os"];
+  category: string;
+  contentType: ContentType;
+  completeness: number;
+  reasons: NoindexReasonCode[];
+  repairEffort: "LOW" | "MEDIUM" | "HIGH";
+  priority: number;
+  recommendedAction: string;
+};
+
+/** 低リスクの1〜2項目修復候補。重複・安全性問題はこのキューに混ぜない。 */
+export function buildNearIndexableQueue(settings: Setting[], evaluations: GuideEvaluation[]): NearIndexableItem[] {
+  const byId = new Map(evaluations.map((evaluation) => [evaluation.id, evaluation]));
+  const repairable = new Set<NoindexReasonCode>([
+    "missing_source", "source_broken", "source_blocked", "missing_verification", "missing_version", "source_generic", "missing_path",
+  ]);
+  return settings.flatMap((setting) => {
+    const evaluation = byId.get(setting.id);
+    if (!evaluation || evaluation.indexable || setting.status === "draft") return [];
+    const reasons = evaluation.noindexReasons;
+    if (!reasons.length || reasons.length > 2 || reasons.some((reason) => !repairable.has(reason))) return [];
+    const effort: NearIndexableItem["repairEffort"] = reasons.length === 1 && ["missing_verification", "missing_version"].includes(reasons[0]) ? "LOW" : reasons.length === 1 ? "MEDIUM" : "HIGH";
+    const valuePoints = Math.min(25, Math.floor(Math.log10(Math.max(0, Number(setting.view_count) || 0) + 1) * 8));
+    const sourcePoints = reasons.includes("source_broken") || reasons.includes("source_generic") ? 4 : 10;
+    const priority = Math.min(100, (evaluation.completeness >= 80 ? 40 : 25) + valuePoints + sourcePoints + (effort === "LOW" ? 20 : effort === "MEDIUM" ? 12 : 5));
+    return [{
+      id: setting.id,
+      slug: setting.slug,
+      title: setting.title,
+      os: setting.os,
+      category: setting.category,
+      contentType: evaluation.contentType,
+      completeness: evaluation.completeness,
+      reasons,
+      repairEffort: effort,
+      priority,
+      recommendedAction: evaluation.recommendedAction,
+    }];
+  }).sort((left, right) => right.priority - left.priority || right.completeness - left.completeness || left.title.localeCompare(right.title, "ja"));
 }
 
 function emptyDimension(): InventoryDimension {
@@ -328,6 +505,8 @@ export function buildContentInventory(
   options: {
     now?: number;
     duplicateIds?: ReadonlySet<string>;
+    aliasDuplicateIds?: ReadonlySet<string>;
+    intentDuplicateIds?: ReadonlySet<string>;
     conflictingIds?: ReadonlySet<string>;
     sourceHealth?: ReadonlyMap<string, SourceHealth>;
   } = {},
@@ -393,6 +572,19 @@ export function buildContentInventory(
 
   const indexable = evaluations.filter((item) => item.indexable).length;
   const brokenSourceCandidates = evaluations.filter((item) => item.statuses.includes("BROKEN_SOURCE")).length;
+  const noindexReasonCounts = Object.fromEntries([
+    "draft", "workflow_not_published", "missing_source", "source_broken", "source_blocked", "source_generic",
+    "missing_verification", "missing_version", "missing_steps", "missing_path", "missing_scope", "duplicate_intent", "conflicting_instructions",
+    "weak_content", "outdated", "unsafe_to_publish", "invalid_metadata", "explicit_noindex", "other",
+  ].map((reason) => [reason, 0])) as Record<NoindexReasonCode, number>;
+  const settingById = new Map(settings.map((setting) => [setting.id, setting]));
+  for (const evaluation of evaluations) {
+    if (evaluation.indexable || settingById.get(evaluation.id)?.status === "draft") continue;
+    for (const reason of evaluation.noindexReasons) noindexReasonCounts[reason] += 1;
+  }
+  const nearIndexable = buildNearIndexableQueue(settings, evaluations).length;
+  const ifMissingRequired = evaluations.filter((item) => item.requiresIfMissing).length;
+  const ifMissingPresent = evaluations.filter((item) => item.requiresIfMissing && settings.find((setting) => setting.id === item.id)?.if_missing?.trim()).length;
   const now = options.now ?? Date.now();
   return {
     inventory: {
@@ -413,9 +605,15 @@ export function buildContentInventory(
       dynamicRelatedEdges,
       invalidRelatedLinks,
       guidesWithoutIfMissing: settings.filter((item) => evaluateGuide(item, options).requiresIfMissing && !item.if_missing?.trim()).length,
+      ifMissingRequired,
+      ifMissingPresent,
+      ifMissingNotApplicable: settings.length - ifMissingRequired,
       reviewOverdue: evaluations.filter((item) => item.statuses.includes("OUTDATED")).length,
-      duplicateCandidates: options.duplicateIds?.size || 0,
+      duplicateCandidates: new Set([...(options.duplicateIds || []), ...(options.aliasDuplicateIds || [])]).size,
       brokenSourceCandidates,
+      nearIndexable,
+      noindexReasonCounts,
+      noindexWithoutReason: evaluations.filter((item) => !item.indexable && settings.find((setting) => setting.id === item.id)?.status !== "draft" && item.noindexReasons.length === 0).length,
       statusCounts,
       sourceTypeCounts,
       byOS,
@@ -452,6 +650,7 @@ export function editorialReviewRows(settings: Setting[], evaluations: GuideEvalu
         ? Number(((setting.not_helpful_count || 0) / ((setting.helpful_count || 0) + (setting.not_helpful_count || 0))).toFixed(4))
         : null,
       duplicate_candidate: evaluation.statuses.includes("DUPLICATE_CANDIDATE") ? "yes" : "no",
+      noindex_reasons: evaluation.indexable ? "" : evaluation.noindexReasons.join("|"),
       recommended_action: evaluation.recommendedAction,
     };
   });
@@ -482,13 +681,14 @@ export function buildReverificationQueue(
     }
     const health = setting.source_url ? sourceHealth.get(setting.source_url) : undefined;
     if (health?.status === "broken" || health?.status === "invalid") {
-      priority += 35;
+      // 引用先が消えた記事は、閲覧数が少なくても根拠を失っているため最優先にする。
+      priority += 60;
       reasons.push("情報源切れ");
     } else if (health?.status === "blocked") {
-      priority += 30;
+      priority += 45;
       reasons.push("情報源の自動確認不可");
     } else if (health?.status === "redirect") {
-      priority += 15;
+      priority += 20;
       reasons.push("情報源移転");
     }
     const views = Math.max(0, Number(setting.view_count) || 0);

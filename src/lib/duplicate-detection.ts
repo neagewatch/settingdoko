@@ -1,4 +1,5 @@
 import { getStepText, Setting } from "./types";
+import { inferContentType } from "./content-operations";
 
 export type DuplicateReason = "same-slug" | "derived-slug" | "same-title" | "same-content" | "variant-title" | "same-intent" | "same-path-source" | "similar-title";
 
@@ -461,4 +462,36 @@ export function detectSearchIntentCandidates(settings: Setting[]): DuplicateGrou
   return detectDuplicateGroups(settings).filter((group) =>
     group.reasons.includes("same-intent") || group.reasons.includes("same-path-source"),
   );
+}
+
+/**
+ * 同一OS・カテゴリ・検索意図で、種別と対象版も一致するグループだけを
+ * 「別名を正規記事へ寄せる候補」として扱う。トラブル対設定、版違い、
+ * メーカー差はここで自動統合しない。
+ */
+export function selectIntentAliasConsolidation(settings: Setting[], groups = detectSearchIntentCandidates(settings)) {
+  const byId = new Map(settings.map((setting) => [setting.id, setting]));
+  const aliasDuplicateIds = new Set<string>();
+  const canonicalByDuplicateId = new Map<string, string>();
+  const safeAliasGroups: DuplicateGroup[] = [];
+  const aliasGroups = groups.filter((group) => {
+    const items = group.items.map((item) => byId.get(item.id)).filter((item): item is Setting => Boolean(item));
+    if (items.length < 2) return false;
+    const types = new Set(items.map((item) => inferContentType(item)));
+    const versions = new Set(items.map((item) => item.version.trim()));
+    if (types.size !== 1 || versions.size !== 1 || !group.reasons.includes("same-intent")) return false;
+    // same-intentだけの類似は曖昧なため、index除外・SQL候補にはしない。
+    // 同じ設定経路と同じ情報源まで一致したグループだけを安全な候補とする。
+    const safe = group.reasons.includes("same-path-source") && group.reasons.includes("same-intent");
+    if (!safe) return true;
+    const canonical = [...items].sort((left, right) => left.title.length - right.title.length || left.slug.localeCompare(right.slug))[0];
+    safeAliasGroups.push(group);
+    for (const item of items) {
+      if (item.id === canonical.id) continue;
+      aliasDuplicateIds.add(item.id);
+      canonicalByDuplicateId.set(item.id, canonical.id);
+    }
+    return true;
+  });
+  return { aliasGroups, safeAliasGroups, aliasDuplicateIds, canonicalByDuplicateId };
 }

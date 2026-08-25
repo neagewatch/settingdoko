@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     .limit(5000);
 
   let logs: SearchLogRecord[] = [];
+  let storage: "daily" | "legacy" = "daily";
   if (!aggregate.error && aggregate.data) {
     logs = aggregate.data.map((row) => ({
       query: row.sample_query,
@@ -40,12 +41,13 @@ export async function GET(request: NextRequest) {
       weak_results: row.weak_results,
     }));
   } else {
+    storage = "legacy";
     const raw = await serverSupabase
       .from("search_logs")
       .select("query,normalized_query,os,result_count,created_at")
       .order("created_at", { ascending: false })
       .limit(2000);
-    if (raw.error) return NextResponse.json({ error: "検索需要を取得できませんでした" }, { status: 500 });
+    if (raw.error) return NextResponse.json({ error: "検索需要テーブルが未適用か、管理者権限で読み取れません" }, { status: 503 });
     logs = (raw.data || []) as SearchLogRecord[];
   }
 
@@ -70,5 +72,7 @@ export async function GET(request: NextRequest) {
       missingGuide: clusters.filter((item) => item.disposition === "MISSING_GUIDE").length,
       weakResult: clusters.filter((item) => item.disposition === "WEAK_RESULT").length,
     },
+    storage,
+    retrievedRows: logs.length,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

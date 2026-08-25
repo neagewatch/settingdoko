@@ -3,6 +3,7 @@ import { serverSupabase } from "./server-supabase";
 import { Setting, OSType, SettingStep, SettingWriteInput, isOSType } from "./types";
 import { allSampleSettings } from "./sample-data-export";
 import { searchSettings } from "./search";
+import type { SourceHealth } from "./content-operations";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface ContentRequest {
@@ -43,7 +44,7 @@ let publicSettingsRequest: Promise<Setting[]> | null = null;
 let publicSearchCache: { data: Setting[]; expiresAt: number } | null = null;
 let publicSearchRequest: Promise<Setting[]> | null = null;
 let publishedStatsCache: { data: PublishedStats; expiresAt: number } | null = null;
-let sourceHealthCache: { data: Map<string, StoredSourceHealthStatus>; expiresAt: number } | null = null;
+let sourceHealthCache: { data: Map<string, SourceHealth>; expiresAt: number } | null = null;
 const categoryPageCache = new Map<string, { data: SettingPageResult; expiresAt: number }>();
 const osCategoryCountsCache = new Map<string, { data: OSCategoryCounts; expiresAt: number }>();
 
@@ -280,15 +281,23 @@ export function clearPublicSettingsCache() {
   osCategoryCountsCache.clear();
 }
 
-export async function getStoredSourceHealth(): Promise<Map<string, StoredSourceHealthStatus>> {
+export async function getStoredSourceHealth(): Promise<Map<string, SourceHealth>> {
   if (sourceHealthCache && sourceHealthCache.expiresAt > Date.now()) return sourceHealthCache.data;
   if (!serverSupabase) return new Map();
-  const result = await serverSupabase.from("source_checks").select("source_url,status");
+  let result = await serverSupabase.from("source_checks").select("source_url,status,http_status,final_url,checked_at");
+  // source_checksが部分適用済みで詳細列だけ不足している場合も、最低限statusを使って公開を保護する。
+  if (result.error) result = await serverSupabase.from("source_checks").select("source_url,status");
   if (result.error) return new Map();
-  const health = new Map<string, StoredSourceHealthStatus>();
+  const health = new Map<string, SourceHealth>();
   for (const row of result.data || []) {
     if (typeof row.source_url !== "string" || !["ok", "redirect", "broken", "blocked", "invalid"].includes(row.status)) continue;
-    health.set(row.source_url, row.status as StoredSourceHealthStatus);
+    health.set(row.source_url, {
+      sourceUrl: row.source_url,
+      status: row.status as StoredSourceHealthStatus,
+      ...(typeof row.http_status === "number" ? { httpStatus: row.http_status } : {}),
+      ...(typeof row.final_url === "string" ? { finalUrl: row.final_url } : {}),
+      ...(typeof row.checked_at === "string" ? { checkedAt: row.checked_at } : {}),
+    });
   }
   sourceHealthCache = { data: health, expiresAt: Date.now() + PUBLIC_CACHE_TTL_MS };
   return health;

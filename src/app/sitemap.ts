@@ -2,19 +2,28 @@ import { MetadataRoute } from "next";
 import { getAllSettings, getStoredSourceHealth } from "@/lib/data";
 import { APP_PLATFORM_TYPES, CATEGORIES, PRIMARY_OS_TYPES } from "@/lib/types";
 import { isSettingIndexable } from "@/lib/content-quality";
+import { sourceHealthBlocksIndex } from "@/lib/content-operations";
+import { detectDuplicateGroups, isStrongDuplicateGroup, selectIntentAliasConsolidation } from "@/lib/duplicate-detection";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
 
 // DB側の記事・情報源ヘルスが更新された後も、再デプロイなしで
-// サイトマップの公開対象を追随させる。毎リクエストではなく1時間ごとに再生成する。
-export const revalidate = 3600;
+// サイトマップの公開対象を追随させる。情報源監査との不一致を長時間残さないため5分ごとに再生成する。
+export const revalidate = 300;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [allSettings, sourceHealth] = await Promise.all([getAllSettings(), getStoredSourceHealth()]);
   const publishedSettings = allSettings.filter((setting) => setting.status !== "draft");
+  const allDuplicateGroups = detectDuplicateGroups(publishedSettings);
+  const duplicateGroups = allDuplicateGroups.filter((group) => isStrongDuplicateGroup(group));
+  const duplicateIds = new Set(duplicateGroups.flatMap((group) => group.items.map((item) => item.id)));
+  const intentAlias = selectIntentAliasConsolidation(publishedSettings, allDuplicateGroups.filter((group) => group.reasons.includes("same-intent") || group.reasons.includes("same-path-source")));
   const settings = publishedSettings.filter((setting) => {
     const health = setting.source_url ? sourceHealth.get(setting.source_url) : undefined;
-    return isSettingIndexable(setting) && health !== "broken" && health !== "invalid";
+    return !duplicateIds.has(setting.id)
+      && !intentAlias.aliasDuplicateIds.has(setting.id)
+      && isSettingIndexable(setting)
+      && !sourceHealthBlocksIndex(health);
   });
 
   // 設定詳細ページ（slug×OS）

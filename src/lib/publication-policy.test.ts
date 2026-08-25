@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { publicationBlocks } from "./publication-policy";
+import { publicationBlocks, publicationStateViolations } from "./publication-policy";
 import type { Setting } from "./types";
 
 function setting(overrides: Partial<Setting> = {}): Setting {
@@ -48,4 +48,45 @@ test("公開時に変更の戻し方と項目がない場合の案内を必須�
 
 test("下書きは公開ゲートの対象外", () => {
   assert.deepEqual(publicationBlocks(setting({ status: "draft", version: "", source_url: null })), []);
+});
+
+test("保存状態の下書き+index指定を矛盾として検出する", () => {
+  const violations = publicationStateViolations(setting({ status: "draft", index_status: "index" }));
+  assert.ok(violations.some((item) => item.code === "DRAFT_INDEXABLE"));
+});
+
+test("危険記事のindex指定を矛盾として検出する", () => {
+  const violations = publicationStateViolations(setting({
+    index_status: "index",
+    title: "iPhoneの写真を完全に削除する",
+    description: "iPhoneの写真を完全に削除して空き容量を増やす手順です。",
+    caution: "",
+  }));
+  assert.ok(violations.some((item) => item.code === "UNSAFE_INDEXABLE"));
+});
+
+test("切れた情報源を検証済み+indexとして保持できない", () => {
+  const violations = publicationStateViolations(setting({ index_status: "index" }), {
+    sourceHealth: { sourceUrl: "https://support.microsoft.com/windows/wifi-on", status: "broken" },
+  });
+  assert.ok(violations.some((item) => item.code === "BROKEN_SOURCE_VERIFIED"));
+});
+
+test("ブロックされた情報源も検証済みのまま公開できない", () => {
+  const violations = publicationStateViolations(setting({ index_status: "index" }), {
+    sourceHealth: { sourceUrl: "https://support.microsoft.com/windows/wifi-on", status: "blocked" },
+  });
+  assert.ok(violations.some((item) => item.code === "BROKEN_SOURCE_VERIFIED"));
+});
+
+test("noindexで再検証待ちの記事は過去の検証日を保持できる", () => {
+  const violations = publicationStateViolations(setting({ index_status: "noindex" }), {
+    sourceHealth: { sourceUrl: "https://support.microsoft.com/windows/wifi-on", status: "broken" },
+  });
+  assert.equal(violations.some((item) => item.code === "BROKEN_SOURCE_VERIFIED"), false);
+});
+
+test("重複候補のindex指定を矛盾として検出する", () => {
+  const violations = publicationStateViolations(setting({ index_status: "index" }), { duplicate: true });
+  assert.ok(violations.some((item) => item.code === "DUPLICATE_INDEXABLE"));
 });

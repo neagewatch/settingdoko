@@ -17,7 +17,9 @@ type QualityResponse = {
     indexable: number; noindex: number; unverified: number; orphanGuides: number;
     explicitOrphanGuides: number; guidesWithoutRelated: number; guidesWithoutExplicitRelated: number;
     dynamicRelatedEdges: number; brokenSourceCandidates: number; duplicateCandidates: number;
+    nearIndexable: number; noindexWithoutReason: number; guidesWithoutIfMissing: number;
   };
+  queues?: { nearIndexable: number; brokenSource: number; duplicateIntent: number; reverificationHigh: number; negativeFeedback: number };
 };
 
 type PriorityFilter = "actionable" | "all" | QualityPriority;
@@ -139,7 +141,12 @@ export default function QualityReviewClient() {
           <span>描画後関連なし {data.inventory.guidesWithoutRelated}</span><span>明示relatedなし {data.inventory.guidesWithoutExplicitRelated}</span>
           <span>動的関連リンク {data.inventory.dynamicRelatedEdges}</span><span>未検証 {data.inventory.unverified}</span>
           <span>情報源切れ候補 {data.inventory.brokenSourceCandidates}</span><span>類似候補 {data.inventory.duplicateCandidates}</span>
+          <span>near-indexable {data.inventory.nearIndexable}</span><span>理由なしnoindex {data.inventory.noindexWithoutReason}</span>
+          <span>if_missing不足（適用対象） {data.inventory.guidesWithoutIfMissing}</span>
         </div>}
+        {data?.queues && <p style={{ margin: "10px 0 0", color: "var(--text-muted)", fontSize: 12 }}>
+          作業キュー：near-indexable {data.queues.nearIndexable} / 情報源確認 {data.queues.brokenSource} / 重複意図 {data.queues.duplicateIntent} / 再検証高優先 {data.queues.reverificationHigh} / 否定票レビュー {data.queues.negativeFeedback}
+        </p>}
         {error && <p role="alert" style={{ margin: "14px 0 0", padding: "10px 12px", borderRadius: 8, background: "#FEF2F2", border: "1px solid #FECACA", color: "#991B1B", fontSize: 13 }}>{error}</p>}
       </div>
 

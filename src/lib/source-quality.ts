@@ -61,7 +61,12 @@ function domainMatches(hostname: string, domains: Set<string>): boolean {
 }
 
 function isGenericSupportLocation(url: URL): boolean {
-  const path = url.pathname.replace(/\/+$/, "");
+  // MicrosoftやGoogleのサポートURLは、地域コードをパスに含めて
+  // `/en-us/windows` のように返すことがある。地域コードを除いてから
+  // 判定しないと、ロケール付きのトップページを個別資料と誤認する。
+  const path = url.pathname
+    .replace(/\/+$/, "")
+    .replace(/^\/[a-z]{2}(?:-[a-z]{2})?(?=\/|$)/i, "");
   if (!path || path === "/") return true;
   // Apple Guideのwelcome URLは版番号を途中に含む形もあるが、いずれも
   // 個別手順ではなく製品ガイドの入口なので根拠資料としては弱い。
@@ -70,10 +75,25 @@ function isGenericSupportLocation(url: URL): boolean {
     "/windows",
     "/android",
     "/chrome",
+    "/pixelphone",
     "/guide/mac-help/welcome/mac",
     "/guide/iphone/welcome/ios",
   ]);
-  return genericPaths.has(path.toLowerCase());
+  const normalizedPath = path.toLowerCase();
+  if (genericPaths.has(normalizedPath)) return true;
+
+  // Device support roots are useful for discovery, but they do not document
+  // the specific procedure behind an article. Keep them out of the source
+  // evidence used for index eligibility until an individual support page is
+  // attached.
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  const manufacturerRoots: Record<string, Set<string>> = {
+    "k-tai.sharp.co.jp": new Set(["/support"]),
+    "www.sony.jp": new Set(["/support/xperia"]),
+    "support.google.com": new Set(["/pixelphone", "/android"]),
+    "samsung.com": new Set(["/support"]),
+  };
+  return manufacturerRoots[host]?.has(normalizedPath) ?? false;
 }
 
 export function assessSource(value: string | null | undefined): SourceAssessment {

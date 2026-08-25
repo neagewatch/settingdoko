@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS search_logs (
   result_count INTEGER NOT NULL DEFAULT 0 CHECK (result_count BETWEEN 0 AND 50),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- 旧版のsearch_logsが先に作られていた環境でも、検索ログAPIが
+-- normalized_query/osを参照できるよう列を補完する。既存行は削除しない。
+ALTER TABLE search_logs ADD COLUMN IF NOT EXISTS normalized_query TEXT;
+ALTER TABLE search_logs ADD COLUMN IF NOT EXISTS os TEXT;
+ALTER TABLE search_logs ADD COLUMN IF NOT EXISTS result_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE search_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+UPDATE search_logs SET normalized_query = LOWER(BTRIM(query)) WHERE normalized_query IS NULL OR BTRIM(normalized_query) = '';
+ALTER TABLE search_logs ALTER COLUMN normalized_query SET DEFAULT '';
 ALTER TABLE search_logs DROP CONSTRAINT IF EXISTS search_logs_os_check;
 ALTER TABLE search_logs ADD CONSTRAINT search_logs_os_check CHECK (os IS NULL OR os IN (
   'windows11','ios','macos','android','windows10','word','excel','powerpoint','outlook','teams',
@@ -205,6 +213,14 @@ CREATE TABLE IF NOT EXISTS search_query_daily (
     'zoom','slack','ipados','power_automate','acrobat'
   ))
 );
+-- 部分適用済みの日次集計表にも不足列を追加する（既存の集計値は保持）。
+ALTER TABLE search_query_daily ADD COLUMN IF NOT EXISTS sample_query TEXT;
+ALTER TABLE search_query_daily ADD COLUMN IF NOT EXISTS searches INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE search_query_daily ADD COLUMN IF NOT EXISTS zero_hits INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE search_query_daily ADD COLUMN IF NOT EXISTS weak_results INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE search_query_daily ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+UPDATE search_query_daily SET sample_query = normalized_query WHERE sample_query IS NULL OR BTRIM(sample_query) = '';
+ALTER TABLE search_query_daily ALTER COLUMN sample_query SET DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_search_query_daily_demand ON search_query_daily(zero_hits DESC, searches DESC, day DESC);
 ALTER TABLE search_query_daily ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON search_query_daily FROM anon, authenticated;

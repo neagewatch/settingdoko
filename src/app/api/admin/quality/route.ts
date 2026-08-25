@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAllSettings, getStoredSourceHealth } from "@/lib/data";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { auditSettingsQuality } from "@/lib/quality-audit";
-import { buildContentInventory, editorialReviewRows } from "@/lib/content-operations";
-import { detectDuplicateGroups } from "@/lib/duplicate-detection";
+import { buildContentInventory, buildNearIndexableQueue, buildReverificationQueue, editorialReviewRows } from "@/lib/content-operations";
+import { detectDuplicateGroups, detectSearchIntentCandidates, isStrongDuplicateGroup, selectIntentAliasConsolidation } from "@/lib/duplicate-detection";
 
 export const dynamic = "force-dynamic";
 
@@ -23,13 +23,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const [settings, storedSourceHealth] = await Promise.all([getAllSettings(true), getStoredSourceHealth()]);
-    const sourceHealth = new Map([...storedSourceHealth].map(([sourceUrl, status]) => [sourceUrl, {
-      sourceUrl, status, checkedAt: "",
-    }] as const));
+    const sourceHealth = storedSourceHealth;
     const audit = auditSettingsQuality(settings, Date.now(), sourceHealth);
     const duplicateGroups = detectDuplicateGroups(settings);
-    const duplicateIds = new Set(duplicateGroups.flatMap((group) => group.items.map((item) => item.id)));
-    const { inventory, evaluations } = buildContentInventory(settings, { duplicateIds, sourceHealth });
+    const strongDuplicateGroups = duplicateGroups.filter((group) => isStrongDuplicateGroup(group));
+    const duplicateIds = new Set(strongDuplicateGroups.flatMap((group) => group.items.map((item) => item.id)));
+    const intentGroups = detectSearchIntentCandidates(settings);
+    const intentDuplicateIds = new Set(intentGroups.flatMap((group) => group.items.map((item) => item.id)));
+    const intentAlias = selectIntentAliasConsolidation(settings, intentGroups);
+    const { inventory, evaluations } = buildContentInventory(settings, { duplicateIds, aliasDuplicateIds: intentAlias.aliasDuplicateIds, intentDuplicateIds, sourceHealth });
+    const nearIndexable = buildNearIndexableQueue(settings, evaluations);
+    const reverification = buildReverificationQueue(settings, sourceHealth);
     if (request.nextUrl.searchParams.get("format") === "csv") {
       return new NextResponse(csv(editorialReviewRows(settings, evaluations)), {
         headers: {
@@ -47,6 +51,16 @@ export async function GET(request: NextRequest) {
       issueCounts: audit.issueCounts,
       inventory,
       duplicateGroups: duplicateGroups.length,
+      searchIntentGroups: intentGroups.length,
+      queues: {
+        nearIndexable: nearIndexable.length,
+        brokenSource: inventory.brokenSourceCandidates,
+        duplicateIntent: intentGroups.length,
+        aliasConsolidation: intentAlias.aliasGroups.length,
+        safeAliasConsolidation: intentAlias.safeAliasGroups.length,
+        reverificationHigh: reverification.filter((item) => item.status === "HIGH_PRIORITY_REVIEW").length,
+        negativeFeedback: reverification.filter((item) => item.reasons.some((reason) => reason.startsWith("否定票"))).length,
+      },
       items: audit.items,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

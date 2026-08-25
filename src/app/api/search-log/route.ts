@@ -44,13 +44,17 @@ export async function POST(request: NextRequest) {
   const normalizedQuery = normalizeDemandQuery(query).slice(0, MAX_QUERY_LENGTH) || query;
   // 新スキーマでは日次集計へupsertし、同じ検索を行単位で無期限保存しない。
   // 移行前環境ではゼロヒットだけを従来テーブルへ保存する。
+  let storage: "daily" | "legacy_zero_hit" | "unavailable" = "daily";
+  let logged = false;
   let { error } = await serverSupabase.rpc("record_search_query", {
     input_query: query,
     input_normalized_query: normalizedQuery,
     input_os: os,
     input_result_count: Math.min(50, resultCount),
   });
-  if (error && ["42883", "PGRST202"].includes(error.code || "")) {
+  if (!error) logged = true;
+  if (error && ["42883", "PGRST202", "42P01", "PGRST205", "42501"].includes(error.code || "")) {
+    storage = resultCount === 0 ? "legacy_zero_hit" : "unavailable";
     if (resultCount === 0) {
       ({ error } = await serverSupabase.from("search_logs").insert({
         query,
@@ -58,14 +62,16 @@ export async function POST(request: NextRequest) {
         os,
         result_count: 0,
       }));
+      logged = !error;
     } else {
-      error = null;
+      // 結果あり検索を旧テーブルへ無制限保存することはせず、未保存を明示する。
+      logged = false;
     }
   }
 
-  if (error && !["42P01", "PGRST205"].includes(error.code || "")) {
+  if (error && !["42P01", "PGRST205", "42501"].includes(error.code || "")) {
     // ログ保存の失敗で検索画面を壊さない。テーブル未作成時も公開機能は継続する。
     console.error("[api/search-log] insert failed", { message: error.message, code: error.code });
   }
-  return NextResponse.json({ ok: true, logged: !error }, { status: 202, headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, logged, storage }, { status: 202, headers: { "Cache-Control": "no-store" } });
 }
