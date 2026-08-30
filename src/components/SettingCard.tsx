@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { Setting } from "@/lib/types";
+import { getArticleCopy } from "@/lib/article-copy";
+import { getReviewedSetting } from "@/lib/editorial-review";
 import OSBadge from "./OSBadge";
 import PathTrail from "./PathTrail";
 
 export default function SettingCard({ setting }: { setting: Setting }) {
+  const displaySetting = getReviewedSetting(setting);
+  const articleCopy = getArticleCopy(displaySetting);
+
   return (
     <Link
-      href={`/setting/${setting.slug}?os=${setting.os}`}
+      href={`/setting/${displaySetting.slug}?os=${displaySetting.os}`}
       className="setting-card"
     >
       <div className="setting-card-meta"
@@ -17,14 +22,14 @@ export default function SettingCard({ setting }: { setting: Setting }) {
           marginBottom: 10,
         }}
       >
-        <OSBadge os={setting.os} />
+        <OSBadge os={displaySetting.os} />
         <span
           style={{
             fontSize: 12,
             color: "var(--text-muted)",
           }}
         >
-          {setting.version}
+          {displaySetting.version}
         </span>
       </div>
       <h3 className="setting-card-title"
@@ -35,9 +40,9 @@ export default function SettingCard({ setting }: { setting: Setting }) {
           color: "var(--text)",
         }}
       >
-        {setting.title}
+        {displaySetting.title}
       </h3>
-      <PathTrail path={setting.path} />
+      <PathTrail path={displaySetting.path} />
       <p className="setting-card-description"
         style={{
           fontSize: 14,
@@ -46,7 +51,7 @@ export default function SettingCard({ setting }: { setting: Setting }) {
           lineHeight: 1.5,
         }}
       >
-        {setting.description}
+        {articleCopy.description}
       </p>
     </Link>
   );

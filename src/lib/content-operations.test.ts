@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildContentInventory, buildReverificationQueue, evaluateGuide } from "./content-operations";
+import { buildContentInventory, buildReverificationQueue, evaluateGuide, inferContentType } from "./content-operations";
 import type { Setting } from "./types";
 
 function guide(overrides: Partial<Setting> = {}): Setting {
@@ -89,6 +89,20 @@ test("情報源切れは閲覧数に関係なく再検証の高優先キュー�
 test("記事種別の明示指定を自動判定より優先する", () => {
   const result = evaluateGuide(guide({ content_type: "troubleshooting", title: "Wi-Fiをオンにする" }), { now: Date.parse("2026-08-23T00:00:00.000Z") });
   assert.equal(result.contentType, "TROUBLESHOOTING_GUIDE");
+});
+
+test("製品バージョンの数字をエラーコードと誤認しない", () => {
+  assert.equal(inferContentType(guide({
+    title: "Officeのアカウント情報を確認する",
+    aliases: ["Microsoft 365アカウント"],
+    keywords: ["ライセンス"],
+  })), "SETTING_GUIDE");
+  assert.equal(inferContentType(guide({
+    title: "Google Playエラー「403」が出るときの対処",
+    aliases: ["Google Play 403"],
+    keywords: ["403"],
+    category: "troubleshoot",
+  })), "ERROR_CODE_GUIDE");
 });
 
 test("リンクグラフの孤立とリンク切れを集計する", () => {

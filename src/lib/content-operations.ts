@@ -150,7 +150,9 @@ export type ReverificationItem = {
   notHelpfulVotes: number;
 };
 
-const ERROR_CODE_PATTERN = /(?:0x[0-9a-f]{4,}|\b(?:caa|err_|error[-_ ]?)?[a-z]*\d{3,}(?:-\d{2,})?\b)/i;
+// バージョン番号や製品名の数字（Microsoft 365など）を、エラーコードと誤認しない。
+// 数字だけのコードは「エラー」「警告」などの文脈がある場合に限って扱う。
+const ERROR_CODE_PATTERN = /(?:0x[0-9a-f]{4,}\b|\b(?:caa|err|error)[-_ ]?[a-z]*\d{2,}\b|(?:エラー(?:コード)?|警告|停止コード|stop\s*code)[^\n]{0,24}\b\d{3,5}(?:-\d{3,5})?\b)/i;
 const TROUBLE_PATTERN = /(できない|つながらない|繋がらない|表示されない|見つからない|使えない|動かない|開かない|届かない|出ない|消えた|遅い|落ちる|失敗|不具合|対処|トラブル)/;
 const MUTATION_PATTERN = /(オフ|無効|解除|削除|消去|変更|リセット|初期化|停止|許可|ブロック|忘れる|サインアウト|ログアウト)/;
 const PLACEHOLDER_PATTERN = /(TODO|TBD|仮タイトル|ここに|ダミー|Lorem ipsum|公開前|候補記事)/i;

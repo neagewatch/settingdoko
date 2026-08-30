@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchDB } from "@/lib/data";
 import { isOSType, OSType, Setting } from "@/lib/types";
+import { getArticleCopy } from "@/lib/article-copy";
+import { getReviewedSetting } from "@/lib/editorial-review";
 
 const MAX_QUERY_LENGTH = 120;
 const MAX_RESULTS = 50;
 
 function toSearchResult(setting: Setting) {
+  const displaySetting = getReviewedSetting(setting);
+  const articleCopy = getArticleCopy(displaySetting);
   return {
-    id: setting.id,
-    title: setting.title,
-    slug: setting.slug,
-    os: setting.os,
-    version: setting.version,
-    category: setting.category,
-    description: setting.description,
-    path: setting.path,
-    verified_at: setting.verified_at ?? null,
+    id: displaySetting.id,
+    title: displaySetting.title,
+    slug: displaySetting.slug,
+    os: displaySetting.os,
+    version: displaySetting.version,
+    category: displaySetting.category,
+    description: articleCopy.description,
+    path: displaySetting.path,
+    verified_at: displaySetting.verified_at ?? null,
   };
 }
 

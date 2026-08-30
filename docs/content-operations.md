@@ -52,6 +52,7 @@ Androidの一般記事は標準Androidまたは確認端末を `device_scope` �
 ```bash
 npm run audit:data
 npm run audit:content -- --input /path/to/settings.json --json /tmp/content-audit.json --csv /tmp/editorial-review.csv
+npm run audit:editorial -- --json /tmp/editorial-brushup.json --csv /tmp/editorial-brushup.csv
 npm run check:sources -- --input /path/to/settings.json --out /tmp/source-health.json
 npm run audit:content -- --input /path/to/settings.json --source-health /tmp/source-health.json
 npm run content:ops -- --input /path/to/settings.json --source-health /tmp/source-health.json --out-dir /tmp/settingdoko-operations
@@ -68,6 +69,8 @@ npm run content:repair -- --input /tmp/settingdoko-production-settings.json --so
 `content:ops` は本文・公開状態を変更せず、`source-repair.csv`、`safe-source-repairs.csv`、`near-indexable.csv`、`repair-batch.csv`、`noindex-reasons.csv`、`related-link-repairs.csv`、`related-link-cleanup.csv`、`editorial-review.csv`、`quality-issues.csv`、`reverification-queue.csv`、`duplicate-review.json`、`intent-review.csv`、`intent-alias-consolidation.csv`、`acquisition-backlog.csv`、`coverage-matrix.csv`を出力する。同一公式ホスト内の個別資料への恒久リダイレクトだけを `safe-source-repairs.sql` に出し、情報源が一般トップへ移った場合は自動更新しない。canonical slugの決定的な関連リンク置換だけを `related-link-repairs.sql` に出す。置換先を推測できないリンクは `related-link-cleanup.sql` で削除候補として分離する。別名追加後に重複候補を公開維持+noindexへするSQLは `intent-alias-noindex.sql` として別出力する。どのSQLも自動適用しない。
 
 `content:repair` は、公式HTTPS情報源と検証日があり、情報源ヘルスも正常で、noindex理由が既知の定型文だけである記事を最大100件選ぶ。既存タイトル・最初の具体的な手順から概要を作り直し、明らかな製品名の重複だけを修正する。情報源、検証日、index_status、公開状態は変更しない。下書き候補の文言が残る記事は自動修正対象から除外する。実行後に生成される `quality-repairs.sql` は、元のタイトル・概要が一致する場合だけ更新するため、SQLエディターで内容を確認してから適用する。
+
+`audit:editorial` は入力した全記事に対して、公開画面用の編集結果を1記事1行で出力する。短い・定型的な概要、発生場面テンプレート、記事テーマと合わない汎用手順、適用範囲、安全注意、元に戻す方法、項目がない場合の分岐を記事ごとに再構成する。補完結果は公開画面で使うが、`source_url`、`verified_at`、`status`、`published_at`は変更せず、出典や検証日のない記事を確認済みにはしない。DBへ自動書き戻しは行わないため、本番へ保存する場合は本番スナップショットを入力し、CSVを人手で確認してから別途安全な更新手順を実施する。
 
 `audit:sitemap` は記事スナップショット・`source_checks`・取得済みsitemapを同じ公開判定で比較し、古いsitemapに残るnoindex URL、未掲載のindexable URL、重複URLを出力する。キャッシュ更新前の本番XMLを入力した場合も、除外URLを個別に確認できる。
 

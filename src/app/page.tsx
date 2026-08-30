@@ -34,6 +34,13 @@ const FEATURES = [
   { id: "privacy-settings", mark: "C", title: "権限・プライバシー" },
 ];
 
+const GUIDE_PROMISES = [
+  { mark: "01", title: "場所を先に見る", note: "設定画面の階層を「→」で確認できます。" },
+  { mark: "02", title: "手順をチェック", note: "今どこまで試したかを確認しながら進められます。" },
+  { mark: "03", title: "注意と分岐を確認", note: "影響・元に戻す方法・項目がない場合も案内します。" },
+  { mark: "04", title: "対象を見極める", note: "OS・バージョン・確認状況を記事ごとに表示します。" },
+];
+
 export default async function Home() {
   const stats = await getPublishedStats();
   const counts = Object.fromEntries(PRIMARY_OS_TYPES.map((os) => [os, stats.byPlatform[os] || 0]));
@@ -60,6 +67,25 @@ export default async function Home() {
           <SearchBox large showButton />
           <p className="search-panel-example">例：通知うるさい・拡張子見たい・マイク使えない</p>
           <div className="search-panel-foot"><kbd className="kbd">/</kbd><span>キーでいつでも検索欄へ移動</span></div>
+        </div>
+      </section>
+
+      <section className="home-section guide-promise-section" aria-labelledby="guide-promise-title">
+        <div className="section-heading-row">
+          <div>
+            <p className="section-index">記事の見方 / WHAT YOU GET</p>
+            <h2 id="guide-promise-title">迷わず操作するための情報</h2>
+          </div>
+          <span className="section-aside">読む前にここだけ確認</span>
+        </div>
+        <div className="guide-promise-grid">
+          {GUIDE_PROMISES.map((item) => (
+            <div key={item.mark} className="guide-promise-item">
+              <span className="guide-promise-mark">{item.mark}</span>
+              <strong>{item.title}</strong>
+              <p>{item.note}</p>
+            </div>
+          ))}
         </div>
       </section>
 

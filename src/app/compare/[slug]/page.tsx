@@ -2,6 +2,8 @@ import { getSettingsBySlug } from "@/lib/data";
 
 export const revalidate = 60;
 import { getStepText } from "@/lib/types";
+import { getArticleCopy } from "@/lib/article-copy";
+import { getReviewedSetting } from "@/lib/editorial-review";
 import PathTrail from "@/components/PathTrail";
 import OSBadge from "@/components/OSBadge";
 import { notFound, redirect } from "next/navigation";
@@ -14,10 +16,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const settings = await getSettingsBySlug(slug);
   if (!settings.length) return { title: "比較" };
-  if (settings.length < 2) return { title: `${settings[0].title}（比較対象なし）`, robots: "noindex" };
+  const displaySetting = getReviewedSetting(settings[0]);
+  if (settings.length < 2) return { title: `${displaySetting.title}（比較対象なし）`, robots: "noindex" };
   return {
-    title: `${settings[0].title} — OS別比較`,
-    description: `${settings[0].title}の設定方法をWindows 11・iPhone・Android・Macで比較します。`,
+    title: `${displaySetting.title} — OS別比較`,
+    description: `${displaySetting.title}の設定場所と手順をWindows 11・iPhone・Android・Macで比較します。`,
     alternates: { canonical: `/compare/${slug}` },
   };
 }
@@ -28,7 +31,7 @@ export default async function ComparePage({ params }: Props) {
   if (!settings.length) notFound();
   if (settings.length < 2) redirect(`/setting/${settings[0].slug}?os=${settings[0].os}`);
 
-  const title = settings[0].title;
+  const title = getReviewedSetting(settings[0]).title;
 
   return (
     <div className="listing-page compare-page" style={{ padding: "32px 0 60px" }}>
@@ -50,24 +53,28 @@ export default async function ComparePage({ params }: Props) {
       </p>
 
       <div className="compare-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-        {settings.map((s) => (
-          <div key={s.id} className="compare-card" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+        {settings.map((s) => {
+          const displaySetting = getReviewedSetting(s);
+          const articleCopy = getArticleCopy(displaySetting);
+          return (
+          <div key={displaySetting.id} className="compare-card" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
             {/* Header */}
             <div className="compare-card-header" style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}>
-              <OSBadge os={s.os} />
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{s.version}</div>
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, margin: "10px 0 0" }}>{s.description}</p>
+              <OSBadge os={displaySetting.os} />
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{displaySetting.version}</div>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, margin: "10px 0 0" }}>{articleCopy.description}</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6, margin: "8px 0 0" }}><strong>確認：</strong>{articleCopy.outcome}</p>
             </div>
             {/* Path */}
             <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>設定場所</p>
-              <PathTrail path={s.path} />
+              <PathTrail path={displaySetting.path} />
             </div>
             {/* Steps */}
             <div style={{ padding: "16px 20px" }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>手順</p>
                 <ol className="compare-steps" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                {s.steps.map((step, i) => (
+                {displaySetting.steps.map((step, i) => (
                   <li key={i} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
                     <span className="compare-step-number" style={{ background: "var(--primary)", color: "white", width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
                     <span style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text)" }}>{getStepText(step)}</span>
@@ -82,7 +89,8 @@ export default async function ComparePage({ params }: Props) {
               </Link>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

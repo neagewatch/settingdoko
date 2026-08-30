@@ -19,6 +19,9 @@ import { safeJsonLd } from "@/lib/structured-data";
 import { getArticleRiskLevel, isReviewOverdue, isSettingIndexable, sourceLabel, type ArticleRiskLevel } from "@/lib/content-quality";
 import { rankContextualRelated, sourceHealthBlocksIndex } from "@/lib/content-operations";
 import { canonicalSlug } from "@/lib/duplicate-detection";
+import { getArticleCopy } from "@/lib/article-copy";
+import { getReviewedSetting } from "@/lib/editorial-review";
+import { GuideFollowUp, GuideOrientation } from "@/components/GuideContext";
 import Image from "next/image";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
@@ -37,22 +40,24 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   if (!allOS.length && legacySlug !== slug) allOS = await getSettingsBySlug(legacySlug);
   const setting = os ? allOS.find((item) => item.os === os) : allOS.find((item) => item.os === "windows11") || allOS[0];
   if (!setting) return { title: "設定が見つかりません" };
-  const versionLabel = setting.version ? ` ${setting.version}` : "";
-  const ogImageUrl = `${BASE_URL}/api/og?title=${encodeURIComponent(setting.title)}&os=${setting.os}&path=${encodeURIComponent(setting.path.join(" › "))}`;
-  const description = `${setting.description} 対応：${OS_LABELS[setting.os]}${versionLabel}`.slice(0, 160);
+  const displaySetting = getReviewedSetting(setting);
+  const articleCopy = getArticleCopy(displaySetting);
+  const versionLabel = displaySetting.version ? ` ${displaySetting.version}` : "";
+  const ogImageUrl = `${BASE_URL}/api/og?title=${encodeURIComponent(displaySetting.title)}&os=${displaySetting.os}&path=${encodeURIComponent(displaySetting.path.join(" › "))}`;
+  const description = `${articleCopy.description} 対応：${OS_LABELS[displaySetting.os]}${versionLabel}`.slice(0, 160);
   const sourceHealth = await getStoredSourceHealth();
   const health = setting.source_url ? sourceHealth.get(setting.source_url) : undefined;
   const indexable = isSettingIndexable(setting) && !sourceHealthBlocksIndex(health);
   return {
-    title: `${setting.title}（${OS_LABELS[setting.os]}${versionLabel}）`,
+    title: `${displaySetting.title}（${OS_LABELS[displaySetting.os]}${versionLabel}）`,
     description,
     robots: indexable ? undefined : { index: false, follow: true },
     openGraph: {
-      title: `${setting.title} | 設定どこ？`,
-      description: setting.description,
-      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: setting.title }],
+      title: `${displaySetting.title} | 設定どこ？`,
+      description: articleCopy.description,
+      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: displaySetting.title }],
     },
-    twitter: { card: "summary_large_image", title: `${setting.title} | 設定どこ？`, description: setting.description, images: [ogImageUrl] },
+    twitter: { card: "summary_large_image", title: `${displaySetting.title} | 設定どこ？`, description: articleCopy.description, images: [ogImageUrl] },
     alternates: { canonical: `/setting/${setting.slug}?os=${setting.os}` },
   };
 }
@@ -87,6 +92,8 @@ async function renderDetail(
   availableOS: string[]
 ) {
   const progressKey = `${setting.slug}-${setting.os}`;
+  const displaySetting = getReviewedSetting(setting);
+  const articleCopy = getArticleCopy(displaySetting);
 
   // 前/次ナビ用：同OSのカテゴリ内設定を取得
   const osSettings = await getSettingsByOS(setting.os as OSType);
@@ -97,15 +104,15 @@ async function renderDetail(
   const explicitlyRelated = await getRelatedSettings(setting.related_slugs, setting.id);
   const contextualRelated = rankContextualRelated(setting, osSettings, new Set(explicitlyRelated.map((item) => item.id)));
   const related = [...explicitlyRelated, ...contextualRelated].slice(0, 5);
-  const stepImages = setting.steps
+  const stepImages = displaySetting.steps
     .map(getStepImage)
     .flatMap(({ image_url }) => image_url ? [image_url] : []);
 
   const canonicalUrl = `${BASE_URL}/setting/${setting.slug}?os=${setting.os}`;
   const articleLd = {
     "@context": "https://schema.org", "@type": "Article",
-    headline: setting.title,
-    description: setting.description,
+    headline: displaySetting.title,
+    description: articleCopy.description,
     datePublished: setting.published_at || setting.updated_at,
     dateModified: setting.updated_at,
     mainEntityOfPage: canonicalUrl,
@@ -113,14 +120,14 @@ async function renderDetail(
     author: { "@type": "Organization", name: "設定どこ？", url: BASE_URL },
     publisher: { "@type": "Organization", name: "設定どこ？", url: BASE_URL },
     ...(setting.source_url ? { citation: setting.source_url } : {}),
-    ...(stepImages.length > 0 ? { image: stepImages } : setting.screenshot_url ? { image: [setting.screenshot_url] } : {}),
+    ...(stepImages.length > 0 ? { image: stepImages } : displaySetting.screenshot_url ? { image: [displaySetting.screenshot_url] } : {}),
   };
   const breadcrumbLd = {
     "@context": "https://schema.org", "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "ホーム", item: `${BASE_URL}/` },
       { "@type": "ListItem", position: 2, name: OS_LABELS[setting.os], item: `${BASE_URL}/os/${setting.os}` },
-      { "@type": "ListItem", position: 3, name: setting.title, item: canonicalUrl },
+      { "@type": "ListItem", position: 3, name: displaySetting.title, item: canonicalUrl },
     ],
   };
   const card = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "24px 28px", marginBottom: 14 };
@@ -132,7 +139,7 @@ async function renderDetail(
     <div className="setting-page" style={{ padding: "28px 0 60px" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(articleLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }} />
-      <ViewTracker slug={slug} os={setting.os} title={setting.title} />
+      <ViewTracker slug={slug} os={setting.os} title={displaySetting.title} />
 
       {/* 印刷用ヘッダー（画面では非表示） */}
       <div className="print-header" style={{ display: "none" }}>
@@ -146,7 +153,7 @@ async function renderDetail(
         <span>›</span>
         <Link href={`/os/${setting.os}`} style={{ color: "var(--text-muted)", textDecoration: "none" }}>{OS_LABELS[setting.os]}</Link>
         <span>›</span>
-        <span style={{ color: "var(--text-secondary)" }}>{setting.title}</span>
+        <span style={{ color: "var(--text-secondary)" }}>{displaySetting.title}</span>
       </nav>
 
       {/* OS Tabs */}
@@ -164,27 +171,27 @@ async function renderDetail(
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-              <OSBadge os={setting.os} />
-              {setting.version && <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{setting.version}</span>}
-              <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{CATEGORIES[setting.category] || setting.category}</span>
-              <span className="article-status-chip">全{setting.steps.length}手順</span>
-              {setting.estimate_minutes && <span className="article-status-chip">目安{setting.estimate_minutes}分</span>}
-              {setting.verified_at && <span className="article-status-chip verified">{new Date(setting.verified_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long" })}確認</span>}
+              <OSBadge os={displaySetting.os} />
+              {displaySetting.version && <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{displaySetting.version}</span>}
+              <span style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--surface-2)", padding: "2px 10px", borderRadius: 6 }}>{CATEGORIES[displaySetting.category] || displaySetting.category}</span>
+              <span className="article-status-chip">全{displaySetting.steps.length}手順</span>
+              {displaySetting.estimate_minutes && <span className="article-status-chip">目安{displaySetting.estimate_minutes}分</span>}
+              {displaySetting.verified_at && <span className="article-status-chip verified">{new Date(displaySetting.verified_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long" })}確認</span>}
               {risk && <span className={`article-status-chip risk-${riskLevel}`}>{risk.label}</span>}
             </div>
-            <h1 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 10px", letterSpacing: "-0.01em" }}>{setting.title}</h1>
-            <p style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>{setting.description}</p>
+            <h1 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 10px", letterSpacing: "-0.01em" }}>{displaySetting.title}</h1>
+            <p style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>{articleCopy.description}</p>
           </div>
           <div className="no-print">
-            <BookmarkButton slug={slug} os={setting.os} title={setting.title} category={setting.category} />
+            <BookmarkButton slug={slug} os={setting.os} title={displaySetting.title} category={setting.category} />
           </div>
         </div>
         <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定場所</span>
-            <span className="no-print"><CopyPathButton path={setting.path} /></span>
+            <span className="no-print"><CopyPathButton path={displaySetting.path} /></span>
           </div>
-          <PathTrail path={setting.path} />
+          <PathTrail path={displaySetting.path} />
         </div>
       </div>
 
@@ -192,11 +199,13 @@ async function renderDetail(
       <div className="answer-card" style={{ ...card, borderColor: "var(--primary)", background: "var(--primary-soft)" }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "var(--primary)", marginBottom: 8 }}>最短回答</div>
         <p style={{ margin: 0, fontSize: 16, fontWeight: 700, lineHeight: 1.7 }}>
-          {setting.path.join(" → ")}
+          {displaySetting.path.join(" → ")}
         </p>
-        {setting.device_scope && <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>対象：{setting.device_scope}</p>}
-        {setting.impact && <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--text-secondary)" }}><strong>設定するとどうなる：</strong>{setting.impact}</p>}
+        <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>対象：{articleCopy.scope}</p>
+        <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--text-secondary)" }}><strong>操作後の確認：</strong>{articleCopy.outcome}</p>
       </div>
+
+      <GuideOrientation setting={displaySetting} />
 
       {!setting.verified_at && (
         <aside className="verification-note" style={{ ...card, padding: "14px 18px", borderColor: "#FBBF24", background: "#FFFBEB", color: "#92400E", fontSize: 13, lineHeight: 1.7 }}>
@@ -210,24 +219,24 @@ async function renderDetail(
         </aside>
       )}
 
-      {risk && !setting.caution && (
+      {risk && !displaySetting.caution && (
         <aside className={`risk-notice risk-${riskLevel}`} style={{ ...card, padding: "16px 18px" }}>
           <strong>{risk.label}：</strong>{risk.fallback}
         </aside>
       )}
 
       {/* Real screenshot if available */}
-      {setting.screenshot_url && (
+      {displaySetting.screenshot_url && (
         <div className="setting-screenshot" style={{ marginBottom: 14 }}>
           <div style={{ marginBottom: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定画面スクリーンショット</span>
           </div>
-          {isSupabaseImage(setting.screenshot_url) ? (
-            <Image src={setting.screenshot_url} alt={setting.title} width={1200} height={675} sizes="(max-width: 840px) 100vw, 840px" style={{ width: "100%", height: "auto", borderRadius: 12, border: "1px solid var(--border)", display: "block" }} />
+          {isSupabaseImage(displaySetting.screenshot_url) ? (
+            <Image src={displaySetting.screenshot_url} alt={displaySetting.title} width={1200} height={675} sizes="(max-width: 840px) 100vw, 840px" style={{ width: "100%", height: "auto", borderRadius: 12, border: "1px solid var(--border)", display: "block" }} />
           ) : (
             // 管理画面に登録された旧URLも壊さず表示する。新規画像はSupabaseへ保存する。
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={setting.screenshot_url} alt={setting.title} loading="lazy" decoding="async" style={{ width: "100%", borderRadius: 12, border: "1px solid var(--border)", display: "block" }} />
+            <img src={displaySetting.screenshot_url} alt={displaySetting.title} loading="lazy" decoding="async" style={{ width: "100%", borderRadius: 12, border: "1px solid var(--border)", display: "block" }} />
           )}
         </div>
       )}
@@ -236,24 +245,19 @@ async function renderDetail(
       <div className="steps-card" style={card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>手順</h2>
-          <span className="no-print"><CopyStepsButton steps={setting.steps} path={setting.path} /></span>
+          <span className="no-print"><CopyStepsButton steps={displaySetting.steps} path={displaySetting.path} /></span>
         </div>
-        <StepChecklist steps={setting.steps} progressKey={progressKey} />
+        <StepChecklist steps={displaySetting.steps} progressKey={progressKey} />
       </div>
 
-      {(setting.caution || setting.rollback) && (
+      {(displaySetting.caution || displaySetting.rollback) && (
         <div className="notice-card" style={{ ...card, background: "var(--surface-2)" }}>
-          {setting.caution && <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7 }}><strong>注意：</strong>{setting.caution}</p>}
-          {setting.rollback && <p style={{ margin: setting.caution ? "10px 0 0" : 0, fontSize: 13, lineHeight: 1.7 }}><strong>元に戻す：</strong>{setting.rollback}</p>}
+          {displaySetting.caution && <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7 }}><strong>注意：</strong>{displaySetting.caution}</p>}
+          {displaySetting.rollback && <p style={{ margin: displaySetting.caution ? "10px 0 0" : 0, fontSize: 13, lineHeight: 1.7 }}><strong>元に戻す：</strong>{displaySetting.rollback}</p>}
         </div>
       )}
 
-      {setting.if_missing && (
-        <section className="notice-card if-missing-card" style={{ ...card, background: "var(--surface-2)" }} aria-labelledby="if-missing-heading">
-          <h2 id="if-missing-heading" style={{ margin: "0 0 8px", fontSize: 17 }}>項目が見つからない場合</h2>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.8 }}>{setting.if_missing}</p>
-        </section>
-      )}
+      <GuideFollowUp setting={displaySetting} />
 
       {/* Helpful + report */}
       <div className="feedback-card no-print" style={{ ...card, padding: "18px 28px" }}>
@@ -265,14 +269,14 @@ async function renderDetail(
               {setting.verified_at ? <span style={{ fontSize: 12, color: "#15803D" }}>✓ {new Date(setting.verified_at).toLocaleDateString("ja-JP")}に確認</span> : <span style={{ fontSize: 12, color: "var(--danger)" }}>検証日未登録</span>}
               {setting.source_url && <a href={setting.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--primary)", textDecoration: "none" }}>{sourceLabel(setting.source_url)} ↗</a>}
             </div>
-            <ReportButton settingId={setting.id} title={setting.title} />
+          <ReportButton settingId={setting.id} title={displaySetting.title} />
           </div>
         </div>
       </div>
 
       {/* Share */}
       <div className="share-card no-print" style={{ ...card, padding: "18px 28px" }}>
-        <ShareBar title={setting.title} />
+        <ShareBar title={displaySetting.title} />
       </div>
 
       {/* Related */}
