@@ -1,9 +1,23 @@
-import { ImageResponse } from "next/og";
-import { NextRequest } from "next/server";
+function escapeXml(value: string) {
+  return value.replace(/[&<>'\"]/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "'": "&apos;",
+    '"': "&quot;",
+  })[character] || character);
+}
 
-export const runtime = "nodejs";
+function wrapTitle(value: string) {
+  const characters = Array.from(value);
+  const lines: string[] = [];
+  for (let index = 0; index < characters.length; index += 24) {
+    lines.push(characters.slice(index, index + 24).join(""));
+  }
+  return lines.slice(0, 3);
+}
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const title = (searchParams.get("title") || "設定どこ？").slice(0, 160);
   const os = searchParams.get("os") || "";
@@ -24,71 +38,24 @@ export async function GET(request: NextRequest) {
 
   const accentColor = osColors[os] || "#E85D2A";
   const osLabel = osLabels[os] || "";
+  const titleLines = wrapTitle(title).map(escapeXml);
+  const pathLabel = path ? escapeXml(path.replaceAll(" › ", "  ›  ")) : "";
+  const titleMarkup = titleLines.map((line, index) => (
+    `<text x="60" y="${262 + index * 64}" fill="#20262B" font-size="52" font-weight="800">${line}</text>`
+  )).join("");
+  const osMarkup = osLabel
+    ? `<rect x="60" y="130" width="260" height="42" rx="3" fill="${accentColor}18" stroke="${accentColor}40"/><text x="78" y="158" fill="${accentColor}" font-size="18" font-weight="600">${escapeXml(osLabel)}</text>`
+    : "";
+  const pathMarkup = pathLabel
+    ? `<rect x="60" y="470" width="1080" height="54" rx="3" fill="#EDE7DB"/><text x="80" y="505" fill="#5D6870" font-size="22">${pathLabel}</text>`
+    : "";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#F3EFE6"/><rect width="1200" height="8" fill="${accentColor}"/><rect x="60" y="52" width="42" height="42" rx="3" fill="#E85D2A"/><text x="73" y="83" fill="#FFFDF8" font-size="30" font-weight="800">?</text><text x="118" y="82" fill="#20262B" font-size="22" font-weight="800">設定どこ？</text>${osMarkup}${titleMarkup}${pathMarkup}<line x1="60" y1="570" x2="1140" y2="570" stroke="#E2E8F0"/><text x="60" y="605" fill="#94A3B8" font-size="16">設定どこ？</text><text x="1140" y="605" fill="#94A3B8" font-size="16" text-anchor="end">PC・スマホの設定場所を最速で探す</text></svg>`;
 
-  return new ImageResponse(
-    (
-      <div
-        style={{
-          width: "100%", height: "100%",
-          background: "#F3EFE6",
-          display: "flex", flexDirection: "column",
-          fontFamily: "sans-serif",
-          position: "relative",
-        }}
-      >
-        {/* Top accent bar */}
-        <div style={{ width: "100%", height: 8, background: accentColor, display: "flex" }} />
-
-        {/* Main content */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "48px 60px", justifyContent: "center" }}>
-          {/* Site name */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
-            <div style={{ width: 42, height: 42, background: "#E85D2A", color: "#FFFDF8", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, fontWeight: 800 }}>?</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "#20262B" }}>設定どこ？</div>
-          </div>
-
-          {/* OS badge */}
-          {osLabel && (
-            <div style={{
-              display: "flex", alignItems: "center",
-              background: `${accentColor}18`,
-              color: accentColor,
-              border: `1px solid ${accentColor}40`,
-              borderRadius: 2, padding: "6px 16px",
-              fontSize: 18, fontWeight: 600,
-              marginBottom: 20, width: "fit-content",
-            }}>
-              {osLabel}
-            </div>
-          )}
-
-          {/* Title */}
-          <div style={{ fontSize: 52, fontWeight: 800, color: "#20262B", lineHeight: 1.2, marginBottom: 24, letterSpacing: "-1px" }}>
-            {title}
-          </div>
-
-          {/* Path */}
-          {path && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {path.split(" › ").map((segment, i, arr) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ background: "#EDE7DB", padding: "6px 16px", borderRadius: 2, fontSize: 18, color: "#5D6870", fontWeight: 500 }}>
-                    {segment}
-                  </div>
-                  {i < arr.length - 1 && <div style={{ color: "#CBD5E1", fontSize: 20 }}>›</div>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Bottom bar */}
-        <div style={{ padding: "16px 60px", borderTop: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 16, color: "#94A3B8" }}>settingdoko.vercel.app</div>
-          <div style={{ fontSize: 16, color: "#94A3B8" }}>PC・スマホの設定場所を最速で探す</div>
-        </div>
-      </div>
-    ),
-    { width: 1200, height: 630 }
-  );
+  return new Response(svg, {
+    headers: {
+      "Content-Type": "image/svg+xml; charset=utf-8",
+      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
