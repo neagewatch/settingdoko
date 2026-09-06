@@ -32,4 +32,4 @@
 
 | 日付 | 環境 | 内容 | 次の一手 |
 | --- | --- | --- | --- |
-| 2026-09-07 | Mac | 共有メモとプロジェクト固有の `AGENTS.md` ルールを追加 | GitHub に push 後、別環境では pull して内容を確認 |
+| 2026-09-07 | Mac | 共有メモとプロジェクト固有の `AGENTS.md` ルールを追加し、GitHub の `main` へ push | 別環境で `git pull --rebase origin main` を実行して内容を確認 |
