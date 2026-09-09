@@ -151,6 +151,12 @@ const CANONICAL_SLUG_ALIASES: Record<string, string> = {
   trouble6win11signinfailed: "trouble6-win11-signin",
   trouble8win11signinfailed: "trouble6-win11-signin",
   trouble9win11signin: "trouble6-win11-signin",
+  // 同一意図のiPhone文字サイズ記事は、公式資料と確認記録がある記事へ統合する。
+  changetextsizeios: "iphone-text-size",
+  iphonetextsize: "iphone-text-size",
+  // Android通知履歴記事は、個別の公式資料がある記事へ統合する。
+  androidwave4notificationhistory: "android-notification-history",
+  androidnotificationhistory: "android-notification-history",
 };
 
 export function canonicalSlug(slug: string): string {

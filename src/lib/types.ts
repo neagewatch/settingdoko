@@ -1,5 +1,8 @@
 export const PRIMARY_OS_TYPES = ["windows11", "ios", "android", "macos"] as const;
 export type PrimaryOSType = (typeof PRIMARY_OS_TYPES)[number];
+/** 利用者が「端末」として選べるOS。iPadOSはアプリ一覧とは別の入口にする。 */
+export const DEVICE_OS_TYPES = [...PRIMARY_OS_TYPES, "ipados"] as const;
+export type DeviceOSType = (typeof DEVICE_OS_TYPES)[number];
 
 export const APP_PLATFORM_TYPES = [
   "ipados",

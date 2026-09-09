@@ -59,6 +59,7 @@ export default function StepChecklist({
           {completed.length > 0 && (
             <button
               type="button"
+              className="step-progress-reset"
               onClick={handleReset}
               style={{ fontSize: 12, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
             >

@@ -37,13 +37,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, logged: false }, { status: 400 });
   }
 
+  // 成功検索の語句はサーバーに保存しない。公開プライバシー方針と同じ境界を
+  // API側でも強制し、直接POSTされた場合も日次集計へ記録しない。
+  if (resultCount !== 0) {
+    return NextResponse.json({ ok: true, logged: false, storage: "not_collected" }, { status: 202, headers: { "Cache-Control": "no-store" } });
+  }
+
   if (!serverSupabase) {
     return NextResponse.json({ ok: true, logged: false }, { status: 202, headers: { "Cache-Control": "no-store" } });
   }
 
   const normalizedQuery = normalizeDemandQuery(query).slice(0, MAX_QUERY_LENGTH) || query;
-  // 新スキーマでは日次集計へupsertし、同じ検索を行単位で無期限保存しない。
-  // 移行前環境ではゼロヒットだけを従来テーブルへ保存する。
+  // 新スキーマでは0件検索だけを日次集計へupsertし、同じ検索を行単位で無期限保存しない。
+  // 移行前環境でもゼロヒットだけを従来テーブルへ保存する。
   let storage: "daily" | "legacy_zero_hit" | "unavailable" = "daily";
   let logged = false;
   let { error } = await serverSupabase.rpc("record_search_query", {
@@ -54,19 +60,14 @@ export async function POST(request: NextRequest) {
   });
   if (!error) logged = true;
   if (error && ["42883", "PGRST202", "42P01", "PGRST205", "42501"].includes(error.code || "")) {
-    storage = resultCount === 0 ? "legacy_zero_hit" : "unavailable";
-    if (resultCount === 0) {
-      ({ error } = await serverSupabase.from("search_logs").insert({
-        query,
-        normalized_query: normalizedQuery,
-        os,
-        result_count: 0,
-      }));
-      logged = !error;
-    } else {
-      // 結果あり検索を旧テーブルへ無制限保存することはせず、未保存を明示する。
-      logged = false;
-    }
+    storage = "legacy_zero_hit";
+    ({ error } = await serverSupabase.from("search_logs").insert({
+      query,
+      normalized_query: normalizedQuery,
+      os,
+      result_count: 0,
+    }));
+    logged = !error;
   }
 
   if (error && !["42P01", "PGRST205", "42501"].includes(error.code || "")) {

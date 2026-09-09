@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/os/ios", label: "iPhone" },
   { href: "/os/android", label: "Android" },
   { href: "/os/macos", label: "Mac" },
+  { href: "/os/ipados", label: "iPad" },
   { href: "/apps", label: "アプリ" },
 ];
 
@@ -20,6 +21,10 @@ export default function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const catRef = useRef<HTMLDivElement>(null);
+  const categoryButtonRef = useRef<HTMLButtonElement>(null);
+  const categoryWasOpen = useRef(false);
+  const mobileMenuRef = useRef<HTMLButtonElement>(null);
+  const mobileWasOpen = useRef(false);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -39,6 +44,16 @@ export default function SiteHeader() {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (categoryWasOpen.current && !catOpen) categoryButtonRef.current?.focus();
+    categoryWasOpen.current = catOpen;
+  }, [catOpen]);
+
+  useEffect(() => {
+    if (mobileWasOpen.current && !mobileOpen) mobileMenuRef.current?.focus();
+    mobileWasOpen.current = mobileOpen;
+  }, [mobileOpen]);
 
   return (
     <>
@@ -70,6 +85,7 @@ export default function SiteHeader() {
             {/* Category dropdown */}
             <div ref={catRef} style={{ position: "relative" }}>
               <button
+                ref={categoryButtonRef}
                 type="button"
                 onClick={() => setCatOpen((v) => !v)}
                 className={`site-nav-link ${pathname?.startsWith("/category") ? "active" : ""}`}
@@ -108,9 +124,9 @@ export default function SiteHeader() {
 
             <div className="site-nav-divider" />
             <Link href="/bookmarks" className={`site-nav-link ${pathname === "/bookmarks" ? "active" : ""}`}>
-              保存済み
+              ブックマーク
             </Link>
-            <Link href="/feature/new-pc-setup" className="site-nav-link" style={{ color: "var(--accent)" }}>
+            <Link href="/feature" className="site-nav-link" style={{ color: "var(--accent)" }}>
               特集
             </Link>
           </nav>
@@ -118,7 +134,7 @@ export default function SiteHeader() {
           <div className="site-header-actions">
             <FontSizeToggle />
             <DarkModeToggle />
-            <button className="mobile-menu-btn" type="button" onClick={() => setMobileOpen((v) => !v)} aria-label="メニュー" aria-expanded={mobileOpen} aria-controls="mobile-navigation">
+            <button ref={mobileMenuRef} className="mobile-menu-btn" type="button" onClick={() => setMobileOpen((v) => !v)} aria-label="メニュー" aria-expanded={mobileOpen} aria-controls="mobile-navigation">
               {mobileOpen ? "✕" : "☰"}
             </button>
           </div>
@@ -126,7 +142,7 @@ export default function SiteHeader() {
       </header>
 
       {/* Mobile nav */}
-      <div id="mobile-navigation" className={`mobile-nav no-print ${mobileOpen ? "open" : ""}`} aria-hidden={!mobileOpen}>
+      <div id="mobile-navigation" className={`mobile-nav no-print ${mobileOpen ? "open" : ""}`} aria-hidden={!mobileOpen} inert={!mobileOpen}>
         {NAV_ITEMS.map((item) => (
           <Link key={item.href} href={item.href} className="mobile-nav-link" onClick={() => setMobileOpen(false)}>
             {item.label}
@@ -144,8 +160,8 @@ export default function SiteHeader() {
           ))}
         </div>
         <div style={{ height: 1, background: "var(--border)", margin: "8px 16px" }} />
-        <Link href="/bookmarks" className="mobile-nav-link" onClick={() => setMobileOpen(false)}>保存済み</Link>
-        <Link href="/feature/new-pc-setup" className="mobile-nav-link" onClick={() => setMobileOpen(false)}>特集・まとめ</Link>
+        <Link href="/bookmarks" className="mobile-nav-link" onClick={() => setMobileOpen(false)}>ブックマーク</Link>
+        <Link href="/feature" className="mobile-nav-link" onClick={() => setMobileOpen(false)}>特集・まとめ</Link>
       </div>
     </>
   );

@@ -79,3 +79,13 @@ test("全候補記事の編集パスは定型文を残さず、元の検証情�
     assert.equal(reviewed.setting.status, setting.status, setting.slug);
   }
 });
+
+test("Android通知が表示されない記事は、通知が見える場合だけ長押しする条件を示す", () => {
+  const setting = loadLocalCandidateSettings().find((item) => item.slug === "trouble-android-notifications");
+  assert.ok(setting);
+  const reviewed = reviewArticle(setting).setting;
+  assert.equal(reviewed.path.includes("おやすみ時間"), false);
+  const steps = reviewed.steps.map((step) => typeof step === "string" ? step : step.text).join(" ");
+  assert.match(steps, /1件でも表示される場合/);
+  assert.match(steps, /一切表示されない場合はこの手順を飛ばす/);
+});

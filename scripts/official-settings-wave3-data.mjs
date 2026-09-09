@@ -115,7 +115,7 @@ const windowsSettingsWave3 = [
 const iphoneSettingsWave3 = [
   I({ title: "iPhoneでアプリごとの言語を変更する", slug: "ios-guide-app-language", category: "app", path: ["設定", "一般", "言語と地域", "アプリの言語"] , steps: ["「設定」→「一般」→「言語と地域」を開く", "アプリごとの言語設定が表示される場合は対象アプリを選ぶ", "使いたい言語を選ぶ", "アプリを終了して再度開く", "対応している場合だけ言語が切り替わることを確認する"], keywords: ["iPhone", "iOS 26", "アプリの言語", "英語", "日本語"], aliases: ["アプリだけ英語にしたい", "iPhoneのアプリ言語を変える", "アプリの表示言語"], related_slugs: ["iphone-default-apps", "change-display-language-ios"] }),
   I({ title: "iPhoneのデフォルト検索エンジンを変更する", slug: "ios-guide-default-search-engine", category: "app", path: ["設定", "検索", "検索エンジン"] , steps: ["「設定」→「検索」を開く", "検索エンジンまたは検索に関する項目を選ぶ", "使いたい検索エンジンを選択する", "SafariやSpotlightで検索する", "検索結果の提供元が変わったか確認する"], keywords: ["iPhone", "iOS 26", "検索エンジン", "Google", "Safari", "既定"], aliases: ["iPhoneの検索をGoogleに", "検索エンジンを変えたい", "標準検索を変更"], related_slugs: ["iphone-default-apps", "safari-private-mode-ios"] }),
-  I({ title: "iPhoneの予測変換をオン・オフする", slug: "ios-guide-keyboard-predictive", category: "input", path: ["設定", "一般", "キーボード", "予測"] , steps: ["「設定」→「一般」→「キーボード」を開く", "「予測」または予測変換のスイッチを探す", "予測候補を使うならオン、表示しないならオフにする", "メモなどで文字を入力して確認する", "候補が不要なときはキーボード上の表示も確認する"], keywords: ["iPhone", "予測変換", "キーボード", "文字入力", "候補"], aliases: ["予測変換を消す", "iPhoneの変換候補", "入力候補を出さない"], related_slugs: ["change-text-size-ios", "text-replacement-ios"] }),
+  I({ title: "iPhoneの予測変換をオン・オフする", slug: "ios-guide-keyboard-predictive", category: "input", path: ["設定", "一般", "キーボード", "予測"] , steps: ["「設定」→「一般」→「キーボード」を開く", "「予測」または予測変換のスイッチを探す", "予測候補を使うならオン、表示しないならオフにする", "メモなどで文字を入力して確認する", "候補が不要なときはキーボード上の表示も確認する"], keywords: ["iPhone", "予測変換", "キーボード", "文字入力", "候補"], aliases: ["予測変換を消す", "iPhoneの変換候補", "入力候補を出さない"], related_slugs: ["iphone-text-size", "text-replacement-ios"] }),
   I({ title: "iPhoneで片手キーボードを使う", slug: "ios-guide-keyboard-one-handed", category: "input", path: ["キーボード", "地球儀または絵文字キー", "片手用キーボード"] , steps: ["文字を入力できるアプリでキーボードを表示する", "地球儀または絵文字キーを長押しする", "左寄せまたは右寄せのキーボードを選ぶ", "片手で入力できる幅になったことを確認する", "中央へ戻すにはキーボード横の矢印をタップする"], keywords: ["iPhone", "片手入力", "キーボード", "左手", "右手"], aliases: ["iPhoneを片手で入力", "キーボードを右寄せ", "キーボードを小さく"], related_slugs: ["text-replacement-ios", "ios-guide-keyboard-predictive"] }),
   I({ title: "iPhoneで音声入力を設定する", slug: "ios-guide-keyboard-dictation", category: "input", path: ["設定", "一般", "キーボード", "音声入力"] , steps: ["「設定」→「一般」→「キーボード」を開く", "「音声入力を有効にする」をオンにする", "確認が表示されたら内容を確認して有効にする", "文字入力欄でマイクボタンをタップする", "話し終わったらキーボードボタンをタップして確定する"], keywords: ["iPhone", "音声入力", "文字起こし", "マイク", "キーボード"], aliases: ["話して文字を入力", "iPhone音声入力", "音声入力が出ない"], related_slugs: ["allow-microphone-ios", "text-replacement-ios"] }),
   I({ title: "iPhoneでSiriに通知を読み上げさせる", slug: "ios-guide-siri-announce-notifications", category: "notification", path: ["設定", "Siri", "通知の読み上げ"] , steps: ["「設定」→「Siri」または「Apple IntelligenceとSiri」を開く", "通知の読み上げを選ぶ", "通知を読み上げる機能をオンにする", "アプリごとに読み上げを許可するか選ぶ", "対応するイヤフォンなどで通知を受けて確認する"], keywords: ["iPhone", "Siri", "通知", "読み上げ", "イヤホン"], aliases: ["通知を読み上げ", "iPhoneに通知を読ませる", "AirPodsで通知を聞く"], related_slugs: ["disable-notifications-ios", "focus-mode-ios"], caution: "周囲に聞かれたくない内容が読み上げられないよう、アプリごとの許可を確認してください。" }),
@@ -233,7 +233,7 @@ const wave3Settings = [
 
 // 既存記事の名称変更・OS別slugの違いを吸収し、関連リンクを切らさない。
 const WAVE3_RELATED_SLUG_ALIASES = {
-  "change-display-language-ios": "change-text-size-ios",
+  "change-display-language-ios": "ios-guide-app-language",
   "iphone-private-hotspot": "iphone-personal-hotspot",
   "take-screenshot-ios": "iphone-screen-capture-settings",
   "android-guide-usb-protection": "android-usb-data-transfer",
@@ -244,7 +244,9 @@ const WAVE3_RELATED_SLUG_ALIASES = {
   "macos-default-browser": "change-default-browser-macos",
 };
 for (const item of wave3Settings) {
-  item.related_slugs = item.related_slugs.map((slug) => WAVE3_RELATED_SLUG_ALIASES[slug] || slug);
+  item.related_slugs = item.related_slugs
+    .map((slug) => WAVE3_RELATED_SLUG_ALIASES[slug] || slug)
+    .filter((slug, index, slugs) => slug !== item.slug && slugs.indexOf(slug) === index);
 }
 
 export { wave3Settings, windowsSettingsWave3, iphoneSettingsWave3, androidSettingsWave3, macSettingsWave3 };

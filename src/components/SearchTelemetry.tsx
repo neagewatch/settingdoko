@@ -23,6 +23,10 @@ export default function SearchTelemetry({
     reported.add(key);
     logSearch(cleanQuery, resultCount);
 
+    // サーバーへ送るのは、記事追加・検索改善に必要な0件検索だけに限定する。
+    // 成功した検索語はブラウザ内の最近の検索にだけ残し、サーバーへ送信しない。
+    if (resultCount !== 0) return;
+
     void fetch("/api/search-log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

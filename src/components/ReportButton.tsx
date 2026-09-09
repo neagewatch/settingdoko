@@ -59,10 +59,10 @@ export default function ReportButton({ settingId, title }: { settingId: string; 
         style={{
           fontSize: 12, color: "var(--text-muted)", background: "none",
           border: "none", cursor: "pointer", textDecoration: "underline",
-          padding: "10px 4px",
+          padding: "10px 4px", minHeight: 44,
         }}
       >
-        🚩 情報が古い・間違いを報告
+        情報が古い・間違いを報告
       </button>
 
       {open && (
@@ -97,7 +97,7 @@ export default function ReportButton({ settingId, title }: { settingId: string; 
               >
                 キャンセル
               </button>
-              <button disabled={sending || !comment.trim()} onClick={handleSubmit}
+              <button type="button" disabled={sending || !comment.trim()} aria-busy={sending} onClick={handleSubmit}
                 style={{ padding: "8px 20px", borderRadius: 8, background: "var(--primary)", color: "white", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
               >
                 {sending ? "送信中…" : "送信する"}

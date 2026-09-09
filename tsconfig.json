@@ -37,6 +37,9 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    // vinextは独自のroutes.d.tsを生成するため、Next標準のvalidator.tsとは型形式が一致しない。
+    // 生成物を直接編集せず、ルート検証はvinext buildに任せる。
+    ".next/types/validator.ts"
   ]
 }

@@ -8,7 +8,7 @@ export function GuideOrientation({ setting }: { setting: Setting }) {
     <section className="guide-orientation" aria-labelledby="guide-orientation-heading">
       <div className="guide-orientation-header">
         <div>
-          <p className="section-index">READING NOTE / この記事の読み方</p>
+        <p className="section-index">この記事の読み方</p>
           <h2 id="guide-orientation-heading">この記事の使い方</h2>
         </div>
         <span className="guide-type-badge">{copy.kindLabel}</span>
@@ -24,16 +24,6 @@ export function GuideOrientation({ setting }: { setting: Setting }) {
           <dd>{copy.stepSummary}</dd>
         </div>
       </dl>
-      <div className="guide-checkpoints">
-        <div>
-          <span>START / 最初に</span>
-          <p>{copy.firstAction}</p>
-        </div>
-        <div>
-          <span>CHECK / 最後に</span>
-          <p>{copy.lastAction}</p>
-        </div>
-      </div>
       <div className="guide-orientation-tip">
         <strong>操作前</strong>
         <p>{copy.preflight}</p>
@@ -53,12 +43,12 @@ export function GuideFollowUp({ setting }: { setting: Setting }) {
     <section className="guide-follow-up" aria-labelledby="guide-follow-up-heading">
       <div className="guide-follow-up-grid">
         <div className="guide-follow-up-panel">
-          <p className="section-index">CHECK / 操作後</p>
+          <p className="section-index">操作後</p>
           <h2 id="guide-follow-up-heading">{copy.outcomeHeading}</h2>
           <p>{copy.outcome}</p>
         </div>
         <div className="guide-follow-up-panel">
-          <p className="section-index">IF MISSING / 分岐</p>
+          <p className="section-index">項目が見つからない場合</p>
           <h2>{copy.missingHeading}</h2>
           <p>{copy.missing}</p>
         </div>

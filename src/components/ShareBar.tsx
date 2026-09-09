@@ -44,7 +44,7 @@ export default function ShareBar({ title }: { title: string }) {
   return (
     <>
       <div className="share-bar">
-        <span style={{ fontSize: 13, color: "var(--text-muted)", marginRight: 4 }}>シェア:</span>
+        <span style={{ fontSize: 13, color: "var(--text-muted)", marginRight: 4 }}>共有</span>
 
         <a
           href={currentUrl ? `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}` : "#"}
@@ -64,16 +64,16 @@ export default function ShareBar({ title }: { title: string }) {
           LINE
         </a>
 
-        <button onClick={handleCopyUrl} className="share-btn share-btn-copy">
-          {urlCopied ? "✓ コピー済み" : "🔗 URLをコピー"}
+        <button type="button" onClick={handleCopyUrl} className="share-btn share-btn-copy">
+          {urlCopied ? "✓ コピー済み" : "URLをコピー"}
         </button>
 
         <button ref={qrTriggerRef} type="button" onClick={() => setShowQR(true)} className="share-btn share-btn-qr" aria-haspopup="dialog" aria-expanded={showQR}>
-          📱 QRコード
+          QRコード
         </button>
 
-        <button onClick={() => window.print()} className="share-btn share-btn-print no-print">
-          🖨 印刷
+        <button type="button" onClick={() => window.print()} className="share-btn share-btn-print no-print">
+          印刷
         </button>
       </div>
 

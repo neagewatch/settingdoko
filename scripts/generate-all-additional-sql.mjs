@@ -156,7 +156,7 @@ const allAdditional = [
     aliases:["AssistiveTouch","アシスティブタッチ","仮想ホームボタン","画面上ボタン","アクセシビリティ"],
     path:["設定","アクセシビリティ","タッチ","AssistiveTouch"],
     steps:["「設定」アプリを開く","「アクセシビリティ」をタップ","「タッチ」をタップ","「AssistiveTouch」をタップ","「AssistiveTouch」をオンにする","画面上に丸いボタンが表示される"],
-    related_slugs:["change-text-size-ios"],
+    related_slugs:["iphone-text-size"],
     keywords:["AssistiveTouch","アシスティブタッチ","ホームボタン","アクセシビリティ","タッチ"],
     description:"画面上に仮想ボタンを表示するAssistiveTouchを有効にする方法です。" },
 
@@ -282,7 +282,7 @@ const allAdditional = [
     aliases:["WiFi接続","ワイファイ","無線LAN","インターネット接続","WiFiパスワード"],
     path:["設定","ネットワークとインターネット","インターネット"],
     steps:["「設定」アプリを開く","「ネットワークとインターネット」→「インターネット」をタップ","Wi-Fiがオンになっていることを確認","接続したいネットワーク名をタップ","パスワードを入力して「接続」をタップ"],
-    related_slugs:["change-dns-android","toggle-airplane-android"],
+    related_slugs:["trouble-android-internet","trouble13-unique-android-private-dns"],
     keywords:["Wi-Fi","WiFi","接続","ネットワーク","パスワード","インターネット"],
     description:"AndroidスマホをWi-Fiに接続する方法です。" },
 
@@ -370,7 +370,7 @@ const allAdditional = [
     aliases:["文字サイズ","フォントサイズ","文字大きく","テキストサイズ","見やすく"],
     path:["設定","ディスプレイ","フォントサイズと表示サイズ"],
     steps:["「設定」アプリを開く","「ディスプレイ」をタップ","「フォントサイズと表示サイズ」をタップ","「フォントサイズ」スライダーで文字の大きさを調整"],
-    related_slugs:["change-text-size-ios","change-text-size"],
+    related_slugs:["iphone-text-size","change-text-size"],
     keywords:["フォント","文字","サイズ","大きく","アクセシビリティ","ディスプレイ"],
     description:"Androidのシステム全体のフォント（文字）サイズを変更する方法です。" },
 

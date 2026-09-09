@@ -30,9 +30,9 @@ export default function ContactPage() {
         </section>
 
         <section className="contact-option">
-          <p className="contact-option-label">03 / その他</p>
-          <h2>問い合わせフォーム</h2>
-          <p>氏名やメールアドレスを入力せずに、内容だけ送信できます。返信は行わず、サイト改善に利用します。</p>
+          <p className="contact-option-label">03 / 返信しない改善受付</p>
+          <h2>サイト改善のために送る</h2>
+          <p>返信を前提としない改善受付です。氏名やメールアドレスを入力せずに、内容だけ送信できます。記事の修正、検索語の追加、表示上の不具合の確認に利用します。</p>
           <ContactForm />
         </section>
       </div>

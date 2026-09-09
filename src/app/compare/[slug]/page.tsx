@@ -44,7 +44,7 @@ export default async function ComparePage({ params }: Props) {
         <span style={{ color: "var(--text-secondary)" }}>{title}</span>
       </div>
 
-      <p className="section-index">COMPARE / OSを比べる</p>
+      <p className="section-index">端末を比べる</p>
       <h1 className="page-title" style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>
         {title}
       </h1>

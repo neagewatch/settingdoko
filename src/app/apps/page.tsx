@@ -16,7 +16,7 @@ const GROUPS: Array<{ title: string; platforms: AppPlatformType[] }> = [
   { title: "ブラウザ", platforms: ["chrome", "edge", "firefox", "safari"] },
   { title: "Googleサービス", platforms: ["gmail", "google_calendar", "google_drive", "youtube"] },
   { title: "連絡・会議", platforms: ["line", "slack", "zoom"] },
-  { title: "そのほか", platforms: ["ipados", "acrobat"] },
+  { title: "その他のサービス", platforms: ["acrobat"] },
 ];
 
 export default async function AppsPage() {
@@ -32,7 +32,7 @@ export default async function AppsPage() {
       </nav>
 
       <header className="listing-heading">
-        <p className="section-index">APPS / アプリから探す</p>
+        <p className="section-index">アプリから探す</p>
         <h1>アプリ・ブラウザの設定とトラブル解決</h1>
         <p>使っているアプリを選ぶと、設定方法と困りごとの解決手順を確認できます。</p>
       </header>

@@ -48,10 +48,15 @@ export function BookmarkList() {
   }, []);
 
   if (!mounted || items.length === 0) return (
-    <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-muted)" }}>
+    <div className="bookmark-empty-state" style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-muted)" }}>
       <p style={{ fontSize: 36, marginBottom: 12 }}>☆</p>
       <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>ブックマークがありません</p>
       <p style={{ fontSize: 14 }}>設定ページの ☆ ボタンで保存できます</p>
+      <div className="empty-search-actions" style={{ justifyContent: "center", marginTop: 20 }}>
+        <Link href="/search" className="primary-button">設定を探す</Link>
+        <Link href="/diagnose" className="secondary-button">症状から探す</Link>
+      </div>
+      <p className="bookmark-empty-note">ブックマークはこのブラウザー内に保存されます。</p>
     </div>
   );
 

@@ -52,13 +52,14 @@ export function HelpfulButton({ settingId, initialCount = 0 }: { settingId: stri
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
       <span style={{ fontSize: 14, color: "var(--text-muted)" }}>この記事は役に立ちましたか？</span>
       <button
+        type="button"
         className={`helpful-btn ${result ? "done" : ""}`}
         onClick={() => void handleFeedback("helpful")}
         disabled={Boolean(result)}
       >
-        {result === "helpful" ? "✓ 解決しました！" : result === "not_helpful" ? "回答済み" : "👍 解決した"}
+        {result === "helpful" ? "解決しました！" : result === "not_helpful" ? "回答済み" : "解決した"}
       </button>
-      {!result && <button className="helpful-btn" onClick={() => void handleFeedback("not_helpful")} disabled={saving}>解決しなかった</button>}
+      {!result && <button type="button" className="helpful-btn" onClick={() => void handleFeedback("not_helpful")} disabled={saving}>解決しなかった</button>}
       {count > 0 && <span aria-live="polite" style={{ fontSize: 12, color: "var(--text-muted)" }}>{count}人が役に立ったと回答</span>}
     </div>
   );

@@ -9,6 +9,7 @@ import {
   selectIntentAliasConsolidation,
 } from "./duplicate-detection";
 import type { Setting } from "./types";
+import { loadLocalCandidateSettings } from "../../scripts/candidate-dataset";
 
 function setting(slug: string): Setting {
   return {
@@ -40,6 +41,13 @@ test("基本slugと派生slugを重複候補としてまとめる", () => {
   assert.equal(groups.length, 1);
   assert.ok(groups[0].reasons.includes("derived-slug"));
   assert.equal(isStrongDuplicateGroup(groups[0]), true);
+});
+
+test("主要な同一意図記事は正規記事へ集約する", () => {
+  assert.equal(canonicalSlug("change-text-size-ios"), "iphone-text-size");
+  assert.equal(canonicalSlug("iphone-text-size"), "iphone-text-size");
+  assert.equal(canonicalSlug("android-wave4-notification-history"), "android-notification-history");
+  assert.equal(canonicalSlug("android-notification-history"), "android-notification-history");
 });
 
 test("発生条件だけの派生タイトルは自動整理対象にする", () => {
@@ -109,6 +117,17 @@ test("同一版・同一意図は正規記事1件と別名統合候補へ分け�
   assert.equal(result.aliasGroups.length, 1);
   assert.equal(result.aliasDuplicateIds.size, 1);
   assert.ok(result.canonicalByDuplicateId.has("wifi-enable") || result.canonicalByDuplicateId.has("wifi-on"));
+});
+
+test("ローカル候補の関連リンクは存在する記事だけを参照する", () => {
+  const settings = loadLocalCandidateSettings();
+  const slugs = new Set(settings.map((item) => item.slug));
+  for (const item of settings) {
+    for (const relatedSlug of item.related_slugs) {
+      assert.ok(slugs.has(relatedSlug), `${item.slug} -> ${relatedSlug} が見つかりません`);
+      assert.notEqual(relatedSlug, item.slug, `${item.slug} が自分自身を関連リンクにしています`);
+    }
+  }
 });
 
 test("異なるエラーコードをタイトル類似だけで重複扱いしない", () => {

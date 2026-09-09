@@ -32,6 +32,7 @@ export default function BookmarkButton({
 
   return (
     <button
+      type="button"
       className={`bookmark-btn ${saved ? "saved" : ""}`}
       onClick={toggle}
       title={saved ? "ブックマーク解除" : "ブックマークに追加"}

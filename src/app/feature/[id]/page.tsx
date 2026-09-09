@@ -1,68 +1,12 @@
 import { getAllSettings } from "@/lib/data";
 
 export const revalidate = 60;
-import { OS_LABELS, OSType } from "@/lib/types";
+import { OS_LABELS } from "@/lib/types";
 import SettingCard from "@/components/SettingCard";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-
-type Feature = {
-  id: string;
-  title: string;
-  description: string;
-  emoji: string;
-  os?: OSType;
-  slugs?: string[];
-  categories?: string[];
-};
-
-const FEATURES: Feature[] = [
-  {
-    id: "new-pc-setup",
-    title: "新しいPC買ったらまずやる設定",
-    description: "Windows 11を快適に使うための初期設定チェックリスト",
-    emoji: "💻",
-    os: "windows11",
-    slugs: ["show-file-extensions", "show-hidden-files", "disable-notifications", "change-brightness", "manage-startup-apps", "change-sleep-time", "allow-microphone", "allow-camera"],
-  },
-  {
-    id: "iphone-switch",
-    title: "iPhone乗り換え時の設定チェックリスト",
-    description: "機種変更・新規購入後にすぐ確認すべきiPhoneの設定",
-    emoji: "📱",
-    os: "ios",
-    slugs: ["setup-faceid", "connect-bluetooth-ios", "change-brightness-ios", "allow-microphone-ios", "disable-notifications-ios", "screen-time-ios", "location-services-ios"],
-  },
-  {
-    id: "privacy-settings",
-    title: "プライバシー設定まとめ",
-    description: "マイク・カメラ・位置情報のアクセス権限を見直す",
-    emoji: "🔒",
-    categories: ["privacy", "security"],
-  },
-  {
-    id: "troubleshoot-network",
-    title: "ネット・接続トラブル対処集",
-    description: "Wi-FiやBluetoothが繋がらないときの設定確認ポイント",
-    emoji: "📶",
-    categories: ["network", "bluetooth"],
-  },
-  {
-    id: "notification-control",
-    title: "通知をコントロールする設定まとめ",
-    description: "不要な通知を減らして集中できる環境を作る",
-    emoji: "🔔",
-    categories: ["notification"],
-  },
-  {
-    id: "display-comfort",
-    title: "目と画面に優しい表示設定",
-    description: "明るさ・夜間モード・解像度を最適化して快適な作業環境を",
-    emoji: "🖥",
-    categories: ["display"],
-  },
-];
+import { FEATURES } from "@/lib/features";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -115,7 +59,7 @@ export default async function FeaturePage({ params }: Props) {
       <div className="feature-page-heading" style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
         <span className="feature-page-mark" aria-hidden="true">{featureNumber}</span>
         <div>
-          <p className="section-index">FIELD NOTE / 特集</p>
+          <p className="section-index">特集</p>
           <h1 className="page-title" style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>{feature.title}</h1>
           <p className="page-subtitle" style={{ marginTop: 4 }}>{feature.description}</p>
         </div>

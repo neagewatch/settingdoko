@@ -16,12 +16,13 @@ import Link from "next/link";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { safeJsonLd } from "@/lib/structured-data";
-import { getArticleRiskLevel, isReviewOverdue, isSettingIndexable, sourceLabel, type ArticleRiskLevel } from "@/lib/content-quality";
+import { getArticleRiskLevel, isReviewOverdue, isSettingIndexable, type ArticleRiskLevel } from "@/lib/content-quality";
 import { rankContextualRelated, sourceHealthBlocksIndex } from "@/lib/content-operations";
 import { canonicalSlug } from "@/lib/duplicate-detection";
 import { getArticleCopy } from "@/lib/article-copy";
 import { getReviewedSetting } from "@/lib/editorial-review";
 import { GuideFollowUp, GuideOrientation } from "@/components/GuideContext";
+import ArticleTrustSummary from "@/components/ArticleTrustSummary";
 import Image from "next/image";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://settingdoko.vercel.app";
@@ -35,9 +36,9 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const { slug } = await params;
   const { os } = await searchParams;
   if (os && !isOSType(os)) return { title: "設定が見つかりません", robots: "noindex" };
-  let allOS = await getSettingsBySlug(slug);
   const legacySlug = canonicalSlug(slug);
-  if (!allOS.length && legacySlug !== slug) allOS = await getSettingsBySlug(legacySlug);
+  let allOS = await getSettingsBySlug(legacySlug);
+  if (!allOS.length && legacySlug !== slug) allOS = await getSettingsBySlug(slug);
   const setting = os ? allOS.find((item) => item.os === os) : allOS.find((item) => item.os === "windows11") || allOS[0];
   if (!setting) return { title: "設定が見つかりません" };
   const displaySetting = getReviewedSetting(setting);
@@ -65,6 +66,12 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 export default async function SettingDetailPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const { os } = await searchParams;
+  const canonical = canonicalSlug(slug);
+  if (canonical !== slug) {
+    const canonicalSettings = await getSettingsBySlug(canonical);
+    const canonicalSetting = os ? canonicalSettings.find((item) => item.os === os) : canonicalSettings[0];
+    if (canonicalSetting) permanentRedirect(`/setting/${canonicalSetting.slug}?os=${canonicalSetting.os}`);
+  }
   let allOS = await getSettingsBySlug(slug);
   const legacySlug = canonicalSlug(slug);
   if (!allOS.length && legacySlug !== slug) {
@@ -95,12 +102,8 @@ async function renderDetail(
   const displaySetting = getReviewedSetting(setting);
   const articleCopy = getArticleCopy(displaySetting);
 
-  // 前/次ナビ用：同OSのカテゴリ内設定を取得
+  // 関連リンクの候補は同OSのカテゴリ内から、目的と内容の近さで選ぶ。
   const osSettings = await getSettingsByOS(setting.os as OSType);
-  const catSettings = osSettings.filter((s) => s.category === setting.category);
-  const currentIdx = catSettings.findIndex((s) => s.slug === setting.slug);
-  const prevSetting = currentIdx > 0 ? catSettings[currentIdx - 1] : null;
-  const nextSetting = currentIdx < catSettings.length - 1 ? catSettings[currentIdx + 1] : null;
   const explicitlyRelated = await getRelatedSettings(setting.related_slugs, setting.id);
   const contextualRelated = rankContextualRelated(setting, osSettings, new Set(explicitlyRelated.map((item) => item.id)));
   const related = [...explicitlyRelated, ...contextualRelated].slice(0, 5);
@@ -186,38 +189,31 @@ async function renderDetail(
             <BookmarkButton slug={slug} os={setting.os} title={displaySetting.title} category={setting.category} />
           </div>
         </div>
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>設定場所</span>
-            <span className="no-print"><CopyPathButton path={displaySetting.path} /></span>
-          </div>
-          <PathTrail path={displaySetting.path} />
-        </div>
       </div>
 
       {/* 最短回答 */}
       <div className="answer-card" style={{ ...card, borderColor: "var(--primary)", background: "var(--primary-soft)" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "var(--primary)", marginBottom: 8 }}>最短回答</div>
+        <div className="answer-card-heading">
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "var(--primary)" }}>最短回答 / 設定場所</div>
+          <span className="no-print"><CopyPathButton path={displaySetting.path} /></span>
+        </div>
+        <PathTrail path={displaySetting.path} />
         <p style={{ margin: 0, fontSize: 16, fontWeight: 700, lineHeight: 1.7 }}>
-          {displaySetting.path.join(" → ")}
+          {articleCopy.firstAction}
         </p>
         <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>対象：{articleCopy.scope}</p>
         <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--text-secondary)" }}><strong>操作後の確認：</strong>{articleCopy.outcome}</p>
       </div>
 
+      <ArticleTrustSummary
+        scope={articleCopy.scope}
+        sourceUrl={displaySetting.source_url}
+        sourceType={displaySetting.source_type}
+        verifiedAt={displaySetting.verified_at}
+        reviewOverdue={reviewOverdue}
+      />
+
       <GuideOrientation setting={displaySetting} />
-
-      {!setting.verified_at && (
-        <aside className="verification-note" style={{ ...card, padding: "14px 18px", borderColor: "#FBBF24", background: "#FFFBEB", color: "#92400E", fontSize: 13, lineHeight: 1.7 }}>
-          <strong>確認日未登録：</strong>OSの更新で設定名や場所が変わることがあります。画面が異なる場合は、下の「情報が古い・間違いを報告」から教えてください。
-        </aside>
-      )}
-
-      {reviewOverdue && (
-        <aside className="verification-note" style={{ ...card, padding: "14px 18px", fontSize: 13, lineHeight: 1.7 }}>
-          <strong>再確認が必要です：</strong>見直し予定日を過ぎています。画面や項目名が違う場合は、ページ下部からお知らせください。
-        </aside>
-      )}
 
       {risk && !displaySetting.caution && (
         <aside className={`risk-notice risk-${riskLevel}`} style={{ ...card, padding: "16px 18px" }}>
@@ -266,8 +262,6 @@ async function renderDetail(
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: "var(--text-muted)" }}>更新: {new Date(setting.updated_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}</span>
-              {setting.verified_at ? <span style={{ fontSize: 12, color: "#15803D" }}>✓ {new Date(setting.verified_at).toLocaleDateString("ja-JP")}に確認</span> : <span style={{ fontSize: 12, color: "var(--danger)" }}>検証日未登録</span>}
-              {setting.source_url && <a href={setting.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--primary)", textDecoration: "none" }}>{sourceLabel(setting.source_url)} ↗</a>}
             </div>
           <ReportButton settingId={setting.id} title={displaySetting.title} />
           </div>
@@ -294,22 +288,6 @@ async function renderDetail(
           </div>
         </div>
       )}
-
-      {/* Prev/Next nav */}
-      <div className="prev-next-nav no-print">
-        {prevSetting ? (
-          <Link href={`/setting/${prevSetting.slug}?os=${prevSetting.os}`} className="prev-next-btn prev">
-            <span className="prev-next-label">← 前の設定</span>
-            <span className="prev-next-title">{prevSetting.title}</span>
-          </Link>
-        ) : <div />}
-        {nextSetting ? (
-          <Link href={`/setting/${nextSetting.slug}?os=${nextSetting.os}`} className="prev-next-btn next">
-            <span className="prev-next-label">次の設定 →</span>
-            <span className="prev-next-title">{nextSetting.title}</span>
-          </Link>
-        ) : <div />}
-      </div>
 
       <div className="no-print" style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
         <Link href={`/os/${setting.os}`} style={{ fontSize: 13, color: "var(--text-muted)", textDecoration: "none" }}>

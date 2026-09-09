@@ -1,7 +1,7 @@
 export const revalidate = 60;
 
 import { getSettingsByCategory } from "@/lib/data";
-import { OS_LABELS, CATEGORIES, PRIMARY_OS_TYPES, isOSType } from "@/lib/types";
+import { OS_LABELS, CATEGORIES, DEVICE_OS_TYPES, isOSType } from "@/lib/types";
 import SettingCard from "@/components/SettingCard";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -81,7 +81,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
         <span style={{ color: "var(--text-secondary)" }}>{CATEGORIES[cat]}</span>
       </div>
 
-      <p className="section-index">CATEGORY / カテゴリから探す</p>
+      <p className="section-index">カテゴリから探す</p>
       <h1 className="page-title" style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>{CATEGORIES[cat]}</h1>
       <p className="page-subtitle" style={{ marginBottom: 18 }}>
         {pageResult.total}件の設定ガイド
@@ -100,7 +100,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       <div className="category-os-filter" aria-label="OSで絞り込む">
         <span className="category-os-filter-label">端末</span>
         <Link href={pageHref(cat, 1)} className={`filter-chip ${!selectedOS ? "active" : ""}`}>すべて</Link>
-        {PRIMARY_OS_TYPES.map((os) => (
+        {DEVICE_OS_TYPES.map((os) => (
           <Link key={os} href={pageHref(cat, 1, os)} className={`filter-chip ${selectedOS === os ? "active" : ""}`}>
             {OS_LABELS[os]}
           </Link>

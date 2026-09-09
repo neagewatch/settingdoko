@@ -4,7 +4,6 @@
 
 import { useState, useEffect, useCallback, useRef, useId } from "react";
 import { useRouter } from "next/navigation";
-import { logSearch } from "@/lib/analytics";
 import { OSType, Setting } from "@/lib/types";
 import OSBadge from "./OSBadge";
 
@@ -25,10 +24,12 @@ export default function SearchBox({
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [activeIdx, setActiveIdx] = useState(-1);
   const [open, setOpen] = useState(false);
+  const [suggestionState, setSuggestionState] = useState<"idle" | "loading" | "error">("idle");
   const router = useRouter();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const composingRef = useRef(false);
   const inputId = useId();
   const listId = `${inputId}-suggestions`;
 
@@ -44,8 +45,10 @@ export default function SearchBox({
       // 検索入力の変更に合わせた候補のリセットは、古い候補を残さないために必要。
       setSuggestions([]);
       setOpen(false);
+      setSuggestionState("idle");
       return;
     }
+    setSuggestionState("loading");
     debounceRef.current = setTimeout(async () => {
       const controller = new AbortController();
       abortRef.current = controller;
@@ -53,14 +56,19 @@ export default function SearchBox({
         const params = new URLSearchParams({ q: searchQuery, limit: "6" });
         if (os) params.set("os", os);
         const res = await fetch(`/api/search?${params.toString()}`, { signal: controller.signal });
-        if (!res.ok) return;
+        if (!res.ok) throw new Error("候補の取得に失敗しました");
         const data = await res.json() as SearchSuggestion[];
         if (controller.signal.aborted) return;
         setSuggestions(Array.isArray(data) ? data.slice(0, 6) : []);
         setOpen(Array.isArray(data) && data.length > 0);
         setActiveIdx(-1);
+        setSuggestionState("idle");
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) setSuggestions([]);
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setSuggestions([]);
+          setOpen(false);
+          setSuggestionState("error");
+        }
       }
     }, 220);
     return () => {
@@ -86,15 +94,13 @@ export default function SearchBox({
     const searchQ = (value || query).trim();
     if (!searchQ) return;
     setOpen(false);
-    // 実際の検索結果件数は検索結果ページでSearchTelemetryが記録する。
-    // 候補件数をゼロ件検索として扱うと誤判定になるため、ここでは未確定(-1)にする。
-    logSearch(searchQ, -1);
     const params = new URLSearchParams({ q: searchQ });
     if (os) params.set("os", os);
     router.push(`/search?${params.toString()}`);
   }, [os, query, router]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing || composingRef.current || e.key === "Process") return;
     if (!open) {
       if (e.key === "Enter") handleSubmit();
       return;
@@ -115,7 +121,11 @@ export default function SearchBox({
   }, [open, activeIdx, suggestions, handleSubmit, goToSetting]);
 
   return (
-    <div className={`search-box-layout ${showButton ? "search-box-with-button" : ""}`}>
+    <form
+      className={`search-box-layout ${showButton ? "search-box-with-button" : ""}`}
+      onSubmit={(event) => { event.preventDefault(); handleSubmit(); }}
+      role="search"
+    >
       <div ref={containerRef} className="search-box-input-wrap" style={{ position: "relative" }}>
       <label htmlFor={inputId} className="sr-only">設定・トラブルを検索</label>
       <span aria-hidden="true" style={{
@@ -130,6 +140,8 @@ export default function SearchBox({
         value={query}
         onChange={(e) => setQuery(e.target.value.slice(0, 120))}
         onKeyDown={handleKeyDown}
+        onCompositionStart={() => { composingRef.current = true; }}
+        onCompositionEnd={() => { composingRef.current = false; }}
         onFocus={() => suggestions.length > 0 && setOpen(true)}
         placeholder={large ? "例：通知うるさい、拡張子見たい、マイク使えない" : "設定・トラブルを検索…"}
         style={large ? { padding: "18px 52px 18px 52px", fontSize: 18, borderRadius: 16 } : {}}
@@ -166,7 +178,7 @@ export default function SearchBox({
               role="option"
               aria-selected={i === activeIdx}
               className={`suggest-item ${i === activeIdx ? "active" : ""}`}
-              onMouseDown={() => goToSetting(s)}
+              onMouseDown={(event) => { event.preventDefault(); goToSetting(s); }}
             >
               <span aria-hidden="true" className="suggest-mark">?</span>
               <span style={{ flex: 1 }}>{s.title}</span>
@@ -177,19 +189,25 @@ export default function SearchBox({
             type="button"
             className="suggest-item"
             style={{ color: "var(--primary)", fontSize: 13 }}
-            onMouseDown={() => handleSubmit()}
+            onMouseDown={(event) => { event.preventDefault(); handleSubmit(); }}
           >
             <span aria-hidden="true">⌕</span>
             <span>「{query}」をすべて検索</span>
           </button>
         </div>
       )}
+      {query.trim() && suggestionState === "loading" && (
+        <span className="search-suggestion-status" role="status">候補を確認中…</span>
+      )}
+      {query.trim() && suggestionState === "error" && (
+        <span className="search-suggestion-status" role="status">候補を取得できません。Enterまたは検索ボタンで検索できます。</span>
+      )}
       </div>
       {showButton && (
-        <button type="button" className="search-box-submit" onClick={() => handleSubmit()}>
+        <button type="submit" className="search-box-submit">
           検索
         </button>
       )}
-    </div>
+    </form>
   );
 }
