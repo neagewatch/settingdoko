@@ -7,7 +7,7 @@ Mac と Windows の作業を再開するための正本メモ。会話履歴の�
 - 対象リポジトリ: `/Users/mm/settingdoko`
 - ブランチ: `codex/announcement-readiness-20260909`
 - 2026-09-09時点では、検索・診断導線・記事表示・共有ノートの改善を実装し、ローカル検証まで完了。プレビュー・本番反映は未実施。
-- 変更はレビュー用ブランチ `codex/announcement-readiness-20260909` のコミット `50f1bce`、共有ノート更新 `2db2bbd` としてGitHubへpush済み。`main`への反映、本番デプロイ、本番DBの変更は未実施。
+- 変更はレビュー用ブランチ `codex/announcement-readiness-20260909` の実装コミット `50f1bce`、共有ノート更新 `2db2bbd`、AGENTS更新 `da2af63` としてGitHubへpush済み。`main`への反映、本番デプロイ、本番DBの変更は未実施。
 - 本番サイト `https://settingdoko.vercel.app` は比較確認だけに使用し、問い合わせ送信・テスト投稿・ダミーデータ投入は行わない。
 
 ## 今回完了した実装
@@ -114,4 +114,4 @@ Mac と Windows の作業を再開するための正本メモ。会話履歴の�
 ## 最終更新
 
 - 更新者: Codex
-- 更新日時: 2026-09-09 JST
+- 更新日時: 2026-09-10 JST
